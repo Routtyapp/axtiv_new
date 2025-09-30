@@ -1,4 +1,4 @@
-export { Button } from './button'
+export { Button } from './Button'
 export { Badge, badgeVariants } from './badge'
 export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent } from './card'
 export { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './dialog'
