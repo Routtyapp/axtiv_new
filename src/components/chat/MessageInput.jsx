@@ -1,17 +1,27 @@
 import { useState, useRef } from "react";
 import { Flex, Text } from "@radix-ui/themes";
 import { Button, Tooltip } from "../ui";
-import OpenAI from "openai";
-import { generateResponse } from "./chatbot";
+import {
+  generateResponse,
+  generateClaudeResponseStream,
+} from "./chatbot";
 import useFileUpload from "../../hooks/useFileUpload";
 import FileUpload from "./FileUpload";
 import AIModelSelector from "./AIModelSelector";
 
-const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
+const MessageInput = ({
+  onSend,
+  onStreamUpdate,
+  disabled,
+  workspaceId,
+  user,
+}) => {
   const [message, setMessage] = useState("");
   const [isAiMode, setIsAiMode] = useState(false);
   const [selectedModel, setSelectedModel] = useState("gpt-5");
+  const [isStreaming, setIsStreaming] = useState(false); // 👈 스트리밍 상태 추가
   const textareaRef = useRef(null);
+  const fallbackRef = useRef(null);
 
   // 파일 업로드 훅
   const fileUpload = useFileUpload(workspaceId, user);
@@ -22,12 +32,17 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
     const hasMessage = message.trim();
     const hasFiles = fileUpload.hasFiles;
 
-    if ((hasMessage || hasFiles) && !disabled && !fileUpload.uploading) {
+    if (
+      (hasMessage || hasFiles) &&
+      !disabled &&
+      !fileUpload.uploading &&
+      !isStreaming
+    ) {
       try {
         // 파일과 함께 메시지 전송
         const messageContent = hasMessage ? message.trim() : null;
 
-        // 임시 messageId 생성 (실제로는 서버에서 생성되지만 파일 업로드용)
+        // 임시 messageId 생성
         const tempMessageId = `temp_${Date.now()}_${Math.random()
           .toString(36)
           .substr(2, 9)}`;
@@ -40,17 +55,18 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
           await onSend(messageContent, "user", uploadedFiles);
 
           try {
-            // provider 판단 (claude로 시작하면 claude, 아니면 openai)
-            const provider = selectedModel.startsWith('claude-') ? 'claude' : 'openai';
+            // provider 판단
+            const provider = selectedModel.startsWith("claude-")
+              ? "claude"
+              : "openai";
 
-            // AI 분석 가능한 파일들 가져오기 (provider에 맞는 형식으로)
+            // AI 분석 가능한 파일들 가져오기
             const aiFiles = fileUpload.getAIFiles(provider);
 
             // messages 형태로 구성
             let messages = [];
 
             // 텍스트 메시지 추가
-            // 파일이 없는 경우 트리거
             if (messageContent || aiFiles.length === 0) {
               const textContent = messageContent || "안녕하세요!";
               messages.push({
@@ -63,8 +79,7 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
             if (aiFiles.length > 0) {
               const content = [];
 
-              // 텍스트 부분 추가
-              const textType = provider === 'claude' ? 'text' : 'input_text';
+              const textType = provider === "claude" ? "text" : "input_text";
               if (messageContent) {
                 content.push({
                   type: textType,
@@ -77,7 +92,6 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
                 });
               }
 
-              // 파일들 추가
               aiFiles.forEach((file) => {
                 content.push(file.apiObject);
               });
@@ -90,12 +104,35 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
               ];
             }
 
-            const aiResponse = await generateResponse(messages, selectedModel);
-            if (aiResponse) {
-              await onSend(aiResponse, "ai");
+            // 🎯 Claude만 스트리밍 사용
+            if (provider === "claude") {
+              setIsStreaming(true);
+
+              const aiResponse = await generateClaudeResponseStream(
+                messages,
+                selectedModel,
+                (partialText) => {
+                  if (onStreamUpdate) {
+                    onStreamUpdate(partialText);
+                  }
+                }
+              );
+
+              if (aiResponse) {
+                await onSend(aiResponse, "ai");
+              }
+
+              setIsStreaming(false);
+            } else {
+              // OpenAI는 기존 방식 (스트리밍 X)
+              const aiResponse = await generateResponse(messages, selectedModel);
+              if (aiResponse) {
+                await onSend(aiResponse, "ai");
+              }
             }
           } catch (error) {
             console.error("AI 응답 생성 중 오류:", error);
+            setIsStreaming(false);
             await onSend(
               "죄송합니다. AI 응답을 생성하는 중 오류가 발생했습니다.",
               "ai"
@@ -114,6 +151,7 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
         }
       } catch (error) {
         console.error("메시지 전송 중 오류:", error);
+        setIsStreaming(false);
       }
     }
   };
@@ -159,22 +197,24 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
               onChange={handleChange}
               onKeyPress={handleKeyPress}
               placeholder={
-                isAiMode
+                isStreaming
+                  ? "AI가 답변 중입니다..."
+                  : isAiMode
                   ? fileUpload.hasAIAnalyzableFiles()
                     ? "AI가 첨부된 파일을 분석하여 답변합니다..."
                     : "AI에게 질문하세요... (파일 첨부 가능)"
                   : "메시지를 입력하세요... (파일 첨부 가능)"
               }
-              disabled={disabled || fileUpload.uploading}
+              disabled={disabled || fileUpload.uploading || isStreaming}
               rows={1}
               className="w-full resize-none border border-gray-200 rounded-lg px-4 py-2.5 pr-12 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed max-h-36 transition-all"
               style={{ minHeight: "44px", lineHeight: "1.5" }}
             />
 
-            {/* 파일 업로드 버튼 - textarea 내부 우측 중앙 */}
+            {/* 파일 업로드 버튼 */}
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
               <input
-                ref={fileUpload.fileInputRef || useRef(null)}
+                ref={fileUpload.fileInputRef || fallbackRef}
                 type="file"
                 multiple
                 onChange={(e) => {
@@ -182,7 +222,7 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
                   if (files && files.length > 0) {
                     fileUpload.handleFileSelect(files);
                   }
-                  e.target.value = '';
+                  e.target.value = "";
                 }}
                 className="hidden"
                 accept="image/*,application/pdf,.doc,.docx,.txt,.md,.zip,.rar,.mp4,.mov,.avi"
@@ -196,7 +236,7 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
                     const input = document.querySelector('input[type="file"]');
                     input?.click();
                   }}
-                  disabled={disabled || fileUpload.uploading}
+                  disabled={disabled || fileUpload.uploading || isStreaming}
                   className="h-8 w-8 p-0 hover:bg-gray-100 rounded-md"
                 >
                   📎
@@ -210,7 +250,7 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
             <AIModelSelector
               value={selectedModel}
               onChange={setSelectedModel}
-              disabled={disabled || fileUpload.uploading}
+              disabled={disabled || fileUpload.uploading || isStreaming}
             />
           )}
 
@@ -220,9 +260,11 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
               variant={isAiMode ? "default" : "outline"}
               size="lg"
               onClick={() => setIsAiMode(!isAiMode)}
-              disabled={disabled || fileUpload.uploading}
+              disabled={disabled || fileUpload.uploading || isStreaming}
               aria-label={isAiMode ? "AI 모드 비활성화" : "AI 모드 활성화"}
-              className={`h-11 shrink-0 ${isAiMode ? "bg-purple-500 hover:bg-purple-600" : ""}`}
+              className={`h-11 shrink-0 ${
+                isAiMode ? "bg-purple-500 hover:bg-purple-600" : ""
+              }`}
             >
               🤖
             </Button>
@@ -233,19 +275,26 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
             disabled={
               disabled ||
               fileUpload.uploading ||
+              isStreaming ||
               (!message.trim() && !fileUpload.hasFiles)
             }
             variant="default"
             size="lg"
             className="h-11 shrink-0"
           >
-            {fileUpload.uploading ? "업로드 중..." : "전송"}
+            {isStreaming
+              ? "답변 중..."
+              : fileUpload.uploading
+              ? "업로드 중..."
+              : "전송"}
           </Button>
         </Flex>
       </form>
       <Flex justify="start" align="center" mt="-1">
         <Text size="1" color="gray">
-          {fileUpload.uploading
+          {isStreaming
+            ? "🤖 AI가 답변을 작성하고 있습니다..."
+            : fileUpload.uploading
             ? `📎 파일 업로드 중... (${
                 fileUpload.selectedFiles.filter((f) => f.uploaded).length
               }/${fileUpload.selectedFiles.length})`

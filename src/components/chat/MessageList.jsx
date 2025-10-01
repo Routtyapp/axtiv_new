@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { Flex, Text } from '@radix-ui/themes'
-import { ScrollArea } from '../ui'
+import { ScrollArea, Avatar } from '../ui'
 import MessageItem from './MessageItem'
+import MessageDisplay from './MessageDisplay'
 
-const MessageList = ({ messages, currentUserId }) => {
+const MessageList = ({ messages, currentUserId, streamingContent, isStreaming }) => {
     const messagesEndRef = useRef(null)
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages])
+    }, [messages, streamingContent]) // 👈 streamingContent도 감지
 
     if (messages.length === 0) {
         return (
@@ -42,6 +43,40 @@ const MessageList = ({ messages, currentUserId }) => {
                         />
                     )
                 })}
+
+                {/* 🎯 스트리밍 중인 AI 메시지 표시 */}
+                {isStreaming && (
+                    <div className="flex justify-start">
+                        <div className="flex gap-2 max-w-[75%]">
+                            <Avatar fallback="🤖" size="2" color="purple" />
+                            <div className="flex flex-col gap-1">
+                                <p className="text-xs text-purple-600">AI Assistant</p>
+                                <div className="px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
+                                    {streamingContent ? (
+                                        <>
+                                            <MessageDisplay 
+                                                message={{ 
+                                                    role: 'assistant', 
+                                                    content: streamingContent 
+                                                }} 
+                                            />
+                                            {/* 타이핑 커서 */}
+                                            <span className="inline-block w-0.5 h-4 bg-purple-600 animate-pulse ml-1"></span>
+                                        </>
+                                    ) : (
+                                        // 로딩 인디케이터
+                                        <div className="flex gap-1 py-1">
+                                            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></span>
+                                            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                                            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div ref={messagesEndRef} />
             </Flex>
         </ScrollArea>

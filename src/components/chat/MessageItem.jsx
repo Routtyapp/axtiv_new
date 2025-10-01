@@ -1,6 +1,7 @@
 import { Avatar, Badge } from '../ui'
 import FileMessage from './FileMessage'
 import MeetingMessageCard from '../meeting/MeetingMessageCard'
+import MessageDisplay from './MessageDisplay' // 👈 추가!
 
 const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
     const formatTime = (timestamp) => {
@@ -126,7 +127,7 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
                             <div
                                 className={`px-3 py-2 rounded-lg break-words ${
                                     isAiMessage
-                                        ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                        ? 'bg-purple-50 text-purple-900 border border-purple-200'
                                         : isOwnMessage
                                             ? message._isOptimistic
                                                 ? 'bg-blue-400 text-white opacity-75'
@@ -134,7 +135,18 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
                                             : 'bg-gray-100 text-gray-900'
                                 } ${hasFiles ? 'mb-2' : ''}`}
                             >
-                                <p className="text-sm">{message.content}</p>
+                                {/* 🎯 AI 메시지는 마크다운 렌더링 */}
+                                {isAiMessage ? (
+                                    <MessageDisplay 
+                                        message={{ 
+                                            role: 'assistant', 
+                                            content: message.content 
+                                        }} 
+                                    />
+                                ) : (
+                                    <p className="text-sm">{message.content}</p>
+                                )}
+                                
                                 {message._isOptimistic && (
                                     <span className="text-xs text-gray-500 ml-2">📤</span>
                                 )}
