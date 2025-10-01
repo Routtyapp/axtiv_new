@@ -15,7 +15,7 @@ const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, cha
     if (!isAuthenticated || !user) {
         return (
             <div className="flex items-center justify-center h-full p-4">
-                <p className="text-gray-500">로그인이 필요합니다.</p>
+                <p className="text-gray-500 dark:text-gray-400">로그인이 필요합니다.</p>
             </div>
         )
     }
@@ -24,11 +24,11 @@ const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, cha
     if (!chatRoomId) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <div className="w-20 h-20 bg-gray-100 dark:bg-[#232323] rounded-full flex items-center justify-center mb-4">
                     <span className="text-4xl">💬</span>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">채팅방을 선택하세요</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-white mb-2">채팅방을 선택하세요</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                     왼쪽 사이드바에서 채팅방을 선택하거나<br />
                     새로운 채팅방을 생성해보세요.
                 </p>
@@ -45,7 +45,7 @@ const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, cha
                     <Skeleton className="h-4 w-1/2" />
                     <Skeleton className="h-4 w-2/3" />
                 </div>
-                <p className="text-sm text-gray-500 text-center">채팅을 로딩중입니다...</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">채팅을 로딩중입니다...</p>
             </div>
         )
     }
@@ -71,7 +71,7 @@ const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, cha
     }
 
     return (
-        <div className="h-full flex flex-col bg-white">
+        <div className="h-full flex flex-col bg-white dark:bg-[#121212]">
             <ChatHeader
                 workspaceName={workspaceName}
                 currentRoomName={chatRoomName}

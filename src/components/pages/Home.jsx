@@ -43,14 +43,7 @@ const Home = () => {
 
       {/* Main Content */}
       <div
-        style={{
-          minHeight: "100vh",
-          background:
-            "linear-gradient(180deg, #f0f4ff 0%, #e8edff 25%, #f5e8ff 50%, #fdf2f8 75%, #fef3f2 100%)",
-          position: "relative",
-          overflow: "hidden",
-          paddingTop: "64px", // Header height
-        }}
+        className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden pt-16"
       >
         {/* Ripple Background */}
         <div className="absolute inset-0" style={{ overflow: "hidden" }}>

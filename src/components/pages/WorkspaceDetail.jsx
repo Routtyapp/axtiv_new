@@ -51,6 +51,8 @@ import {
   Separator,
   TooltipTrigger,
   TooltipContent,
+  Pointer,
+  AnimatedThemeToggler,
 } from "../ui";
 import ChatSidebar from "../chat/ChatSidebar";
 import MeetingManagement from "../meeting/MeetingManagement";
@@ -741,6 +743,9 @@ const WorkspaceDetail = () => {
                     {currentUserProfile?.user_name || user?.email}
                   </p>
                 </div>
+                <AnimatedThemeToggler className="h-8 w-8 p-0 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-accent transition-colors [&>svg]:h-4 [&>svg]:w-4">
+                  <Pointer />
+                </AnimatedThemeToggler>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -748,6 +753,7 @@ const WorkspaceDetail = () => {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                 >
                   <Menu className="h-4 w-4" />
+                  <Pointer />
                 </Button>
               </div>
 
@@ -760,6 +766,7 @@ const WorkspaceDetail = () => {
                   >
                     <User className="h-4 w-4" />
                     <span className="text-sm">프로필 보기</span>
+                    <Pointer />
                   </div>
                   <div className="border-t" />
                   <div
@@ -768,6 +775,7 @@ const WorkspaceDetail = () => {
                   >
                     <span className="text-sm">🚪</span>
                     <span className="text-sm font-medium">로그아웃</span>
+                    <Pointer />
                   </div>
                 </div>
               )}
@@ -778,7 +786,10 @@ const WorkspaceDetail = () => {
         <SidebarInset className="flex-1 min-w-0">
           <div className="flex h-full flex-col w-full">
             <header className="sticky top-0 z-10 bg-background border-b px-6 py-3 flex items-center gap-2 flex-shrink-0">
-              <SidebarTrigger className="h-6 w-6" />
+              <div className="relative">
+                <SidebarTrigger className="h-6 w-6" />
+                <Pointer />
+              </div>
               <div className="h-4 border-l border-border" />
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <span>{company.name}</span>

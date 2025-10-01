@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Theme } from '@radix-ui/themes'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from './contexts/AuthContext'
@@ -12,9 +13,33 @@ import WorkspaceDetail from './components/pages/WorkspaceDetail'
 import './App.css'
 
 function App() {
+  const [theme, setTheme] = useState('light')
+
+  useEffect(() => {
+    // 초기 테마 설정
+    const savedTheme = localStorage.getItem('theme') || 'light'
+    setTheme(savedTheme)
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    }
+
+    // 테마 변경 감지
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark')
+      setTheme(isDark ? 'dark' : 'light')
+    })
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <Theme
-      appearance="light"
+      appearance={theme}
       accentColor="blue"
       grayColor="slate"
       radius="medium"

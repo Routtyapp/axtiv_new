@@ -252,13 +252,7 @@ const Workspace = () => {
             <>
                 <TopHeader />
                 <div
-                    style={{
-                        minHeight: "100vh",
-                        background: "linear-gradient(180deg, #f0f4ff 0%, #e8edff 25%, #f5e8ff 50%, #fdf2f8 75%, #fef3f2 100%)",
-                        position: "relative",
-                        overflow: "hidden",
-                        paddingTop: "64px",
-                    }}
+                    className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden pt-16"
                 >
                     <div style={{ padding: "1.5rem" }}>
                         <Flex justify="center" align="center" direction="column" style={{ minHeight: "calc(100vh - 64px)" }}>
@@ -279,13 +273,7 @@ const Workspace = () => {
             <>
                 <TopHeader />
                 <div
-                    style={{
-                        minHeight: "100vh",
-                        background: "linear-gradient(180deg, #f0f4ff 0%, #e8edff 25%, #f5e8ff 50%, #fdf2f8 75%, #fef3f2 100%)",
-                        position: "relative",
-                        overflow: "hidden",
-                        paddingTop: "64px",
-                    }}
+                    className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden pt-16"
                 >
                     <div style={{ padding: "1.5rem" }}>
                         <Flex justify="center" align="center" direction="column" style={{ minHeight: "calc(100vh - 64px)" }}>
@@ -339,24 +327,12 @@ const Workspace = () => {
         <>
             <TopHeader />
             <div
-                style={{
-                    minHeight: "100vh",
-                    background: "linear-gradient(180deg, #f0f4ff 0%, #e8edff 25%, #f5e8ff 50%, #fdf2f8 75%, #fef3f2 100%)",
-                    position: "relative",
-                    overflow: "hidden",
-                    paddingTop: "64px",
-                }}
+                className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden pt-16"
             >
                 <div style={{ padding: "1.5rem" }}>
                     {/* 탭 네비게이션 */}
                     <div style={{ maxWidth: "1400px", margin: "0 auto", marginBottom: "2rem" }}>
-                        <Flex align="center" gap="3" style={{
-                            background: "white",
-                            padding: "0.5rem",
-                            borderRadius: "12px",
-                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
-                            border: "1px solid #e2e8f0"
-                        }}>
+                        <Flex align="center" gap="3" className="bg-white dark:bg-[#1E1E1E] p-2 rounded-xl shadow-sm border border-gray-200 dark:border-white/12">
                             {/* 내 워크스페이스 탭 */}
                             <button
                                 onClick={() => setActiveTab('my')}

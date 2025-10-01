@@ -32,16 +32,7 @@ const TopHeader = () => {
 
   return (
     <header
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        background: "rgba(255, 255, 255, 0.8)",
-        backdropFilter: "blur(10px)",
-        borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
-      }}
+      className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-[#121212]/95 backdrop-blur-md border-b border-gray-200/60 dark:border-white/12"
     >
       <div
         style={{
@@ -97,10 +88,10 @@ const TopHeader = () => {
                       user?.name?.charAt(0).toUpperCase() ||
                       "U"}
                   </Avatar>
-                  <Text weight="medium" size="2" style={{ color: "#1e293b" }}>
+                  <Text weight="medium" size="2" className="text-gray-800 dark:text-gray-200">
                     {user?.name || user?.email?.split("@")[0] || "사용자"}
                   </Text>
-                  <Text size="1" style={{ color: "#64748b", marginLeft: "4px" }}>
+                  <Text size="1" className="text-gray-500 dark:text-gray-400" style={{ marginLeft: "4px" }}>
                     {dropdownOpen ? "▲" : "▼"}
                   </Text>
                 </Flex>
@@ -109,24 +100,14 @@ const TopHeader = () => {
               {/* Dropdown Menu */}
               {dropdownOpen && (
                 <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    minWidth: "220px",
-                    background: "white",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-                    overflow: "hidden",
-                  }}
+                  className="absolute top-[calc(100%+8px)] right-0 min-w-[220px] bg-white dark:bg-[#232323] border border-gray-200 dark:border-white/12 rounded-lg shadow-lg overflow-hidden"
                 >
                   {/* User Info */}
-                  <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
-                    <Text weight="bold" size="2" style={{ color: "#1e293b", display: "block" }}>
+                  <div className="p-3 border-b border-gray-200 dark:border-white/12">
+                    <Text weight="bold" size="2" className="text-gray-800 dark:text-white/[0.87] block">
                       {user?.name || user?.email?.split("@")[0] || "사용자"}
                     </Text>
-                    <Text size="1" style={{ color: "#64748b", display: "block", marginTop: "4px" }}>
+                    <Text size="1" className="text-gray-500 dark:text-white/60 block mt-1">
                       {user?.email || user.auth_id}
                     </Text>
                   </div>
@@ -139,15 +120,10 @@ const TopHeader = () => {
                       onClick={() => setDropdownOpen(false)}
                     >
                       <div
-                        style={{
-                          padding: "10px 16px",
-                          cursor: "pointer",
-                          transition: "background 0.2s ease",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        className="p-2.5 hover:bg-gray-50 dark:hover:bg-[#272727] transition-colors"
+                        style={{ cursor: "pointer" }}
                       >
-                        <Text size="2" style={{ color: "#1e293b" }}>
+                        <Text size="2" className="text-gray-800 dark:text-white/[0.87]">
                           🏢 내 워크스페이스
                         </Text>
                       </div>
@@ -155,16 +131,10 @@ const TopHeader = () => {
 
                     <div
                       onClick={handleLogout}
-                      style={{
-                        padding: "10px 16px",
-                        cursor: "pointer",
-                        transition: "background 0.2s ease",
-                        borderTop: "1px solid #e2e8f0",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      className="p-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-gray-200 dark:border-white/12"
+                      style={{ cursor: "pointer" }}
                     >
-                      <Text size="2" style={{ color: "#dc2626" }}>
+                      <Text size="2" className="text-red-600 dark:text-[#CF6679]">
                         🚪 로그아웃
                       </Text>
                     </div>

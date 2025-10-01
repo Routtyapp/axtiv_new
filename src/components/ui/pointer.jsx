@@ -65,7 +65,7 @@ export function Pointer(
       <div ref={containerRef} />
       {isActive && (
         <div
-          className="pointer-events-none fixed z-50"
+          className="pointer-events-none fixed z-[9999]"
           style={{
             top: y,
             left: x,

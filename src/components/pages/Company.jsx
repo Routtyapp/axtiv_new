@@ -261,13 +261,7 @@ const Company = () => {
         <>
             <TopHeader />
             <div
-                style={{
-                    minHeight: "100vh",
-                    background: "linear-gradient(180deg, #f0f4ff 0%, #e8edff 25%, #f5e8ff 50%, #fdf2f8 75%, #fef3f2 100%)",
-                    position: "relative",
-                    overflow: "hidden",
-                    paddingTop: "64px",
-                }}
+                className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden pt-16"
             >
                 <div style={{ padding: "1.5rem" }}>
 
@@ -314,13 +308,13 @@ const Company = () => {
                             </Flex>
 
                             {/* 검색 입력창 */}
-                            <Card style={{ width: "100%", background: "white", padding: "1.5rem", borderRadius: "16px", boxShadow: "0 8px 24px rgba(0, 0, 0, 0.1)" }}>
+                            <Card className="w-full bg-white dark:bg-[#1E1E1E] rounded-2xl shadow-xl p-6">
                                 <Input
                                     placeholder="회사명을 입력하세요..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     size="3"
-                                    style={{ fontSize: "16px" }}
+                                    className="text-base"
                                 />
                             </Card>
 
