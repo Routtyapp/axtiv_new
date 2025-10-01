@@ -161,13 +161,13 @@ const ChatRoomList = ({
 
   // 🆕 채팅방 선택 핸들러 (read_status 업데이트 포함)
   const handleRoomSelect = useCallback(
-    async (roomId, roomName) => {
+    async (roomId, roomName, isDefault) => {
       // read_status 업데이트
       await updateReadStatus(roomId);
 
       // 부모 컴포넌트의 onRoomSelect 호출
       if (onRoomSelect) {
-        onRoomSelect(roomId, roomName);
+        onRoomSelect(roomId, roomName, isDefault);
       }
     },
     [onRoomSelect, updateReadStatus]
@@ -258,7 +258,7 @@ const ChatRoomList = ({
           <Button
             key={room.id}
             variant={isSelected ? "default" : "ghost"}
-            onClick={() => handleRoomSelect(room.id, room.name)}
+            onClick={() => handleRoomSelect(room.id, room.name, room.is_default)}
             className="w-full p-3 h-auto flex flex-col items-start transition-colors"
           >
             <div className="flex items-center justify-between w-full mb-1">

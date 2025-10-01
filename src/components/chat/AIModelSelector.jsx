@@ -24,21 +24,9 @@ const aiModels = [
     provider: "openai"
   },
   {
-    value: "gpt-4-turbo",
-    label: "GPT-4 Turbo",
-    description: "빠르고 효율적인 GPT-4",
-    provider: "openai"
-  },
-  {
-    value: "gpt-4o",
-    label: "GPT-4o",
-    description: "멀티모달 최적화 모델",
-    provider: "openai"
-  },
-  {
-    value: "gpt-4",
-    label: "GPT-4",
-    description: "기본 GPT-4 모델",
+    value: "gpt-4.1",
+    label: "GPT-4.1",
+    description: "최신 GPT-4.1 모델",
     provider: "openai"
   },
   {

@@ -2,10 +2,10 @@ import { Theme } from '@radix-ui/themes'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/auth'
+import { Pointer } from './components/ui/pointer'
 import Auth from './components/pages/Auth'
 import AuthCallback from './components/pages/AuthCallback'
 import Home from './components/pages/Home'
-import Test from './components/pages/Test'
 import Company from './components/pages/Company'
 import Workspace from './components/pages/Workspace'
 import WorkspaceDetail from './components/pages/WorkspaceDetail'
@@ -19,7 +19,9 @@ function App() {
       grayColor="slate"
       radius="medium"
       scaling="100%"
+      style={{ cursor: "none" }}
     >
+      <Pointer />
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -47,14 +49,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <WorkspaceDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/test"
-              element={
-                <ProtectedRoute>
-                  <Test />
                 </ProtectedRoute>
               }
             />

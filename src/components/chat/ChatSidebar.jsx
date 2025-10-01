@@ -7,7 +7,7 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import LeaveChatRoomDialog from './LeaveChatRoomDialog'
 
-const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, onLeaveChatRoom }) => {
+const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, chatRoomIsDefault, onLeaveChatRoom }) => {
     const { user, isAuthenticated, getId } = useUser()
     const { messages, loading, error, sendMessage, realtimeStatus } = useRealtimeChat(workspaceId, user, chatRoomId)
     const [showLeaveDialog, setShowLeaveDialog] = useState(false)
@@ -97,7 +97,7 @@ const ChatSidebar = ({ workspaceId, workspaceName, chatRoomId, chatRoomName, onL
                     open={showLeaveDialog}
                     onOpenChange={setShowLeaveDialog}
                     onLeaveSuccess={handleLeaveSuccess}
-                    chatRoom={{ id: chatRoomId, name: chatRoomName, is_default: false }}
+                    chatRoom={{ id: chatRoomId, name: chatRoomName, is_default: chatRoomIsDefault || false }}
                     currentUserId={getId()}
                 />
             )}
