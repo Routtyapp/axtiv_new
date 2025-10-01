@@ -243,19 +243,17 @@ const MessageInput = ({ onSend, disabled, workspaceId, user }) => {
           </Button>
         </Flex>
       </form>
-      <Flex justify="start" align="center" mt="2">
+      <Flex justify="start" align="center" mt="-1">
         <Text size="1" color="gray">
           {fileUpload.uploading
             ? `📎 파일 업로드 중... (${
                 fileUpload.selectedFiles.filter((f) => f.uploaded).length
               }/${fileUpload.selectedFiles.length})`
-            : isAiMode
-            ? fileUpload.hasAIAnalyzableFiles()
-              ? `🤖 AI 모드: ${
-                  fileUpload.getAIFiles().length
-                }개 파일 분석 준비완료 · Enter로 전송`
-              : "🤖 AI 모드 활성화 · Enter로 전송, Shift+Enter로 줄바꿈"
-            : "Enter로 전송, Shift+Enter로 줄바꿈"}
+            : isAiMode && fileUpload.hasAIAnalyzableFiles()
+            ? `🤖 AI 모드: ${
+                fileUpload.getAIFiles().length
+              }개 파일 분석 준비완료`
+            : ""}
         </Text>
       </Flex>
     </div>

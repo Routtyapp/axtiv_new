@@ -17,6 +17,12 @@ import {
   Menu,
   MoreHorizontal,
   Keyboard,
+  Phone,
+  Briefcase,
+  FileText,
+  Pencil,
+  X,
+  Check,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -53,6 +59,14 @@ import {
   TooltipContent,
   Pointer,
   AnimatedThemeToggler,
+  Input,
+  Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Label,
 } from "../ui";
 import ChatSidebar from "../chat/ChatSidebar";
 import MeetingManagement from "../meeting/MeetingManagement";
@@ -81,6 +95,8 @@ const WorkspaceDetail = () => {
     useState(false);
   const [showUserProfileDialog, setShowUserProfileDialog] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editingProfileData, setEditingProfileData] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showKeyboardShortcutsDialog, setShowKeyboardShortcutsDialog] = useState(false);
   const dropdownRef = useRef(null);
@@ -236,7 +252,7 @@ const WorkspaceDetail = () => {
       // users 테이블에서 사용자 정보 조회
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("auth_id, user_name, email, user_role, last_sign_in_at")
+        .select("auth_id, user_name, email, user_role, last_sign_in_at, phone, profile_image_url, department, position, bio, status")
         .eq("auth_id", user.id)
         .maybeSingle();
 
@@ -252,6 +268,12 @@ const WorkspaceDetail = () => {
           email: userData.email,
           user_role: userData.user_role,
           last_sign_in_at: userData.last_sign_in_at,
+          phone: userData.phone,
+          profile_image_url: userData.profile_image_url,
+          department: userData.department,
+          position: userData.position,
+          bio: userData.bio,
+          status: userData.status,
           workspace_role: memberData.role,
           is_online: memberData.is_online,
           last_seen: memberData.last_seen,
@@ -266,7 +288,57 @@ const WorkspaceDetail = () => {
 
   const handleUserProfileClick = () => {
     setShowUserProfileDialog(true);
+    setIsEditingProfile(false);
+    setEditingProfileData(null);
     setDropdownOpen(false);
+  };
+
+  const handleEditProfile = () => {
+    setIsEditingProfile(true);
+    setEditingProfileData({
+      phone: currentUserProfile?.phone || '',
+      department: currentUserProfile?.department || '',
+      position: currentUserProfile?.position || '',
+      bio: currentUserProfile?.bio || '',
+      status: currentUserProfile?.status || 'available',
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false);
+    setEditingProfileData(null);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id || !editingProfileData) return;
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          phone: editingProfileData.phone || null,
+          department: editingProfileData.department || null,
+          position: editingProfileData.position || null,
+          bio: editingProfileData.bio || null,
+          status: editingProfileData.status,
+        })
+        .eq('auth_id', user.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        alert('프로필 업데이트 중 오류가 발생했습니다.');
+        return;
+      }
+
+      // 프로필 다시 불러오기
+      await fetchCurrentUserProfile();
+      setIsEditingProfile(false);
+      setEditingProfileData(null);
+      alert('프로필이 성공적으로 업데이트되었습니다.');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('프로필 저장 중 오류가 발생했습니다.');
+    }
   };
 
   const handleLogout = async () => {
@@ -785,7 +857,7 @@ const WorkspaceDetail = () => {
 
         <SidebarInset className="flex-1 min-w-0">
           <div className="flex h-full flex-col w-full">
-            <header className="sticky top-0 z-10 bg-background border-b px-6 py-3 flex items-center gap-2 flex-shrink-0">
+            <header className="sticky top-0 z-10 bg-background border-b px-6 py-[22.7px] flex items-center gap-2 flex-shrink-0">
               <div className="relative">
                 <SidebarTrigger className="h-6 w-6" />
                 <Pointer />
@@ -823,110 +895,286 @@ const WorkspaceDetail = () => {
       {/* 유저 프로필 Dialog */}
       <Dialog
         open={showUserProfileDialog}
-        onOpenChange={setShowUserProfileDialog}
+        onOpenChange={(open) => {
+          setShowUserProfileDialog(open);
+          if (!open) {
+            setIsEditingProfile(false);
+            setEditingProfileData(null);
+          }
+        }}
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>내 프로필</DialogTitle>
+        <DialogContent className="sm:max-w-lg [&>button]:hidden">
+          <DialogHeader className="relative">
+            <DialogTitle>프로필</DialogTitle>
             <DialogDescription>
-              워크스페이스 내 나의 프로필 정보입니다.
+              업무 프로필 정보
             </DialogDescription>
+
+            {/* 우측 상단 버튼들 */}
+            <div className="absolute right-0 top-0 flex items-center gap-1">
+              {!isEditingProfile ? (
+                <>
+                  <Button
+                    onClick={handleEditProfile}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => setShowUserProfileDialog(false)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={handleCancelEdit}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={handleSaveProfile}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsEditingProfile(false);
+                      setEditingProfileData(null);
+                      setShowUserProfileDialog(false);
+                    }}
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                  >
+                    <X className="h-4 w-4 opacity-50" />
+                  </Button>
+                </>
+              )}
+            </div>
           </DialogHeader>
 
           {currentUserProfile && (
-            <div className="space-y-6">
-              {/* 프로필 헤더 */}
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Avatar className="w-16 h-16">
-                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white text-2xl font-bold">
-                      {currentUserProfile.user_name?.charAt(0).toUpperCase() ||
-                        "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {currentUserProfile.is_online && (
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">
-                    {currentUserProfile.user_name}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    {currentUserProfile.workspace_role === "admin" && (
-                      <Badge variant="secondary" className="text-xs">
-                        워크스페이스 관리자
-                      </Badge>
+            <div className="space-y-4">
+              {/* 프로필 헤더 - 카드 스타일 */}
+              <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-none">
+                <div className="flex items-start gap-3">
+                  <div className="relative">
+                    <Avatar className="w-16 h-16">
+                      {currentUserProfile.profile_image_url ? (
+                        <img
+                          src={currentUserProfile.profile_image_url}
+                          alt={currentUserProfile.user_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white text-2xl font-bold">
+                          {currentUserProfile.user_name?.charAt(0).toUpperCase() || "U"}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    {currentUserProfile.is_online && (
+                      <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
                     )}
-                    {currentUserProfile.user_role === "owner" && (
-                      <Badge variant="default" className="text-xs">
-                        회사 오너
-                      </Badge>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold mb-1">
+                      {currentUserProfile.user_name}
+                    </h3>
+                    {currentUserProfile.position && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {currentUserProfile.position}
+                        {currentUserProfile.department && ` · ${currentUserProfile.department}`}
+                      </p>
                     )}
-                    {currentUserProfile.user_role === "member" &&
-                      currentUserProfile.workspace_role !== "admin" && (
-                        <Badge variant="outline" className="text-xs">
-                          멤버
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {currentUserProfile.workspace_role === "admin" && (
+                        <Badge variant="secondary" className="text-xs">
+                          워크스페이스 관리자
                         </Badge>
                       )}
+                      {currentUserProfile.user_role === "owner" && (
+                        <Badge variant="default" className="text-xs bg-blue-500">
+                          회사 오너
+                        </Badge>
+                      )}
+                      {currentUserProfile.user_role === "admin" && (
+                        <Badge variant="default" className="text-xs bg-purple-500">
+                          회사 관리자
+                        </Badge>
+                      )}
+                      {isEditingProfile ? (
+                        <Select
+                          value={editingProfileData?.status || 'available'}
+                          onValueChange={(value) => setEditingProfileData({...editingProfileData, status: value})}
+                        >
+                          <SelectTrigger className="h-7 w-auto text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="available">🟢 업무 가능</SelectItem>
+                            <SelectItem value="busy">🔴 바쁨</SelectItem>
+                            <SelectItem value="away">🟡 자리비움</SelectItem>
+                            <SelectItem value="in_meeting">📅 회의중</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        currentUserProfile.status && (
+                          <Badge variant="outline" className="text-xs">
+                            {currentUserProfile.status === 'available' && '🟢 업무 가능'}
+                            {currentUserProfile.status === 'busy' && '🔴 바쁨'}
+                            {currentUserProfile.status === 'away' && '🟡 자리비움'}
+                            {currentUserProfile.status === 'in_meeting' && '📅 회의중'}
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {currentUserProfile.is_online ? (
+                        <span className="text-green-600 dark:text-green-400">● 온라인</span>
+                      ) : (
+                        <span>⚫ 오프라인 · {formatLastSeen(currentUserProfile.last_seen)}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bio */}
+                {currentUserProfile.bio && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-muted-foreground">
+                      {currentUserProfile.bio}
+                    </p>
+                  </div>
+                )}
+              </Card>
+
+              {/* 연락처 정보 */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2 text-muted-foreground">연락처</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">이메일</p>
+                      <p className="text-sm font-medium truncate">
+                        {currentUserProfile.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-1">전화번호</p>
+                      {isEditingProfile ? (
+                        <Input
+                          value={editingProfileData?.phone || ''}
+                          onChange={(e) => setEditingProfileData({...editingProfileData, phone: e.target.value})}
+                          placeholder="전화번호를 입력하세요"
+                          className="h-8"
+                        />
+                      ) : (
+                        <p className="text-sm font-medium">
+                          {currentUserProfile.phone || '-'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <Separator />
+              {/* 조직 정보 */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2 text-muted-foreground">조직 정보</h4>
+                <div className="space-y-2">
+                  {/* 부서/직책 한 줄 배치 */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                      <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground mb-1">부서</p>
+                        {isEditingProfile ? (
+                          <Input
+                            value={editingProfileData?.department || ''}
+                            onChange={(e) => setEditingProfileData({...editingProfileData, department: e.target.value})}
+                            placeholder="부서"
+                            className="h-8"
+                          />
+                        ) : (
+                          <p className="text-sm font-medium truncate">
+                            {currentUserProfile.department || '-'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-              {/* 상세 정보 */}
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600">이메일</p>
-                    <p className="text-sm font-medium break-all">
-                      {currentUserProfile.email}
-                    </p>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                      <Briefcase className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground mb-1">직책</p>
+                        {isEditingProfile ? (
+                          <Input
+                            value={editingProfileData?.position || ''}
+                            onChange={(e) => setEditingProfileData({...editingProfileData, position: e.target.value})}
+                            placeholder="직책"
+                            className="h-8"
+                          />
+                        ) : (
+                          <p className="text-sm font-medium truncate">
+                            {currentUserProfile.position || '-'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-gray-400 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600">워크스페이스 역할</p>
-                    <p className="text-sm font-medium">
-                      {currentUserProfile.workspace_role === "admin"
-                        ? "관리자"
-                        : "일반 멤버"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-600">상태</p>
-                    <p className="text-sm font-medium">
-                      {currentUserProfile.is_online ? (
-                        <span className="text-green-600">🟢 온라인</span>
+                  {/* 자기소개 */}
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-muted/30">
+                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground mb-1">자기소개</p>
+                      {isEditingProfile ? (
+                        <Textarea
+                          value={editingProfileData?.bio || ''}
+                          onChange={(e) => setEditingProfileData({...editingProfileData, bio: e.target.value})}
+                          placeholder="간단한 소개를 입력하세요"
+                          className="min-h-[60px] resize-none"
+                        />
                       ) : (
-                        <span className="text-gray-600">
-                          ⚫ 오프라인 · 마지막 접속:{" "}
-                          {formatLastSeen(currentUserProfile.last_seen)}
-                        </span>
+                        <p className="text-sm font-medium whitespace-pre-wrap">
+                          {currentUserProfile.bio || '-'}
+                        </p>
                       )}
-                    </p>
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {currentUserProfile.joined_at && (
-                  <div className="flex items-start gap-3">
-                    <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+              {/* 활동 정보 */}
+              {currentUserProfile.joined_at && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 text-muted-foreground">활동 정보</h4>
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                    <CalendarIcon className="h-5 w-5 text-muted-foreground" />
                     <div className="flex-1">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-muted-foreground">
                         워크스페이스 가입일
                       </p>
                       <p className="text-sm font-medium">
-                        {new Date(
-                          currentUserProfile.joined_at
-                        ).toLocaleDateString("ko-KR", {
+                        {new Date(currentUserProfile.joined_at).toLocaleDateString("ko-KR", {
                           year: "numeric",
                           month: "long",
                           day: "numeric",
@@ -934,28 +1182,8 @@ const WorkspaceDetail = () => {
                       </p>
                     </div>
                   </div>
-                )}
-
-                {currentUserProfile.last_sign_in_at && (
-                  <div className="flex items-start gap-3">
-                    <TrendingUp className="h-5 w-5 text-gray-400 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">마지막 로그인</p>
-                      <p className="text-sm font-medium">
-                        {new Date(
-                          currentUserProfile.last_sign_in_at
-                        ).toLocaleDateString("ko-KR", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
