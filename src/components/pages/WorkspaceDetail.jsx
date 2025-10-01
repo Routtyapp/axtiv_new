@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams, Link } from "react-router";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useParams, Link, useNavigate } from "react-router";
 import {
   MessageCircle,
   Calendar as CalendarIcon,
@@ -14,6 +14,9 @@ import {
   Shield,
   Clock,
   TrendingUp,
+  Menu,
+  MoreHorizontal,
+  Keyboard,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -60,7 +63,8 @@ import DashboardView from "../dashboard/DashboardView";
 
 const WorkspaceDetail = () => {
   const { companyId, workspaceId } = useParams();
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading: authLoading, signOut } = useAuth();
   const [workspace, setWorkspace] = useState(null);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +79,9 @@ const WorkspaceDetail = () => {
     useState(false);
   const [showUserProfileDialog, setShowUserProfileDialog] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showKeyboardShortcutsDialog, setShowKeyboardShortcutsDialog] = useState(false);
+  const dropdownRef = useRef(null);
 
   // 회의가 있는 날짜들을 계산
   const meetingDates = useMemo(() => {
@@ -257,7 +264,29 @@ const WorkspaceDetail = () => {
 
   const handleUserProfileClick = () => {
     setShowUserProfileDialog(true);
+    setDropdownOpen(false);
   };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  // 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const formatLastSeen = (timestamp) => {
     if (!timestamp) return "알 수 없음";
@@ -369,11 +398,11 @@ const WorkspaceDetail = () => {
     }
   };
 
-  const menuItems = [
+  const moreMenuItems = [
     {
-      id: "dashboard",
-      label: "대시보드",
-      icon: BarChart3,
+      id: "keyboard-shortcuts",
+      label: "단축키 안내",
+      icon: Keyboard,
     },
     {
       id: "settings",
@@ -550,30 +579,33 @@ const WorkspaceDetail = () => {
                   {company.name}
                 </p>
               </div>
+              <Link to="/">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Home className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </SidebarHeader>
 
           <SidebarContent className="p-2">
             <SidebarGroup>
               <SidebarMenu>
-                {menuItems.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      onClick={() => {
-                        setActiveMenu(item.id);
-                        setShowMeetingManagement(false); // 메뉴 클릭 시 회의 관리 화면 숨김
-                      }}
-                      className={`w-full justify-start ${
-                        activeMenu === item.id && !showMeetingManagement
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent hover:text-accent-foreground"
-                      }`}
-                    >
-                      <item.icon className="mr-3 h-4 w-4" />
-                      {item.label}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      setActiveMenu('dashboard');
+                      setShowMeetingManagement(false);
+                    }}
+                    className={`w-full justify-start ${
+                      activeMenu === 'dashboard' && !showMeetingManagement
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <BarChart3 className="mr-3 h-4 w-4" />
+                    대시보드
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
 
@@ -649,61 +681,96 @@ const WorkspaceDetail = () => {
                     </div>
                   </AccordionContent>
                 </AccordionItem>
+
+                <AccordionItem value="more">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center">
+                      <MoreHorizontal className="mr-3 h-4 w-4" />
+                      더보기
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-2">
+                    <div className="px-2 space-y-1">
+                      {moreMenuItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                            activeMenu === item.id && !showMeetingManagement && item.id !== "keyboard-shortcuts"
+                              ? "bg-primary text-primary-foreground"
+                              : "hover:bg-accent hover:text-accent-foreground"
+                          }`}
+                          onClick={() => {
+                            if (item.id === "keyboard-shortcuts") {
+                              setShowKeyboardShortcutsDialog(true);
+                            } else {
+                              setActiveMenu(item.id);
+                              setShowMeetingManagement(false);
+                            }
+                          }}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span className="text-sm">{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               </Accordion>
             </SidebarGroup>
           </SidebarContent>
 
           <SidebarFooter className="border-t p-4">
-            <div className="flex items-center gap-3 min-h-[40px]">
-              <Tooltip>
-                <TooltipTrigger asChild>
+            <div className="relative" ref={dropdownRef}>
+              <div className="flex items-center gap-3 min-h-[40px]">
+                <div className="relative flex-shrink-0">
+                  <Avatar>
+                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
+                      {currentUserProfile?.user_name
+                        ?.charAt(0)
+                        .toUpperCase() ||
+                        user?.email?.charAt(0).toUpperCase() ||
+                        "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  {currentUserProfile?.is_online && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {currentUserProfile?.user_name || user?.email}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 flex-shrink-0"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Dropdown Menu */}
+              {dropdownOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-background border rounded-lg shadow-lg overflow-hidden">
                   <div
-                    className="cursor-pointer flex-shrink-0"
+                    className="px-4 py-2.5 hover:bg-accent cursor-pointer transition-colors flex items-center gap-2"
                     onClick={handleUserProfileClick}
                   >
-                    <div className="relative">
-                      <Avatar>
-                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
-                          {currentUserProfile?.user_name
-                            ?.charAt(0)
-                            .toUpperCase() ||
-                            user?.email?.charAt(0).toUpperCase() ||
-                            "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {currentUserProfile?.is_online && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                      )}
-                    </div>
+                    <User className="h-4 w-4" />
+                    <span className="text-sm">프로필 보기</span>
                   </div>
-                </TooltipTrigger>
-                <TooltipContent>내 프로필 보기</TooltipContent>
-              </Tooltip>
-              <div className="flex-1 min-w-0 flex flex-col justify-center">
-                <p className="text-sm font-medium truncate px-2">
-                  {currentUserProfile?.user_name || user?.email}
-                </p>
-                <div className="flex items-center gap-2 ">
-                  <Link to={`/company/${companyId}/workspaces`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                    >
-                      워크스페이스 목록
-                    </Button>
-                  </Link>
-                  <Link to="/">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs px-2"
-                    >
-                      <Home className="h-3 w-3" />
-                    </Button>
-                  </Link>
+                  <div className="border-t" />
+                  <div
+                    className="px-4 py-2.5 hover:bg-destructive/10 cursor-pointer transition-colors flex items-center gap-2 text-destructive"
+                    onClick={handleLogout}
+                  >
+                    <span className="text-sm">🚪</span>
+                    <span className="text-sm font-medium">로그아웃</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </SidebarFooter>
         </Sidebar>
@@ -880,6 +947,100 @@ const WorkspaceDetail = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 단축키 안내 Dialog */}
+      <Dialog
+        open={showKeyboardShortcutsDialog}
+        onOpenChange={setShowKeyboardShortcutsDialog}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Keyboard className="h-5 w-5" />
+              단축키 안내
+            </DialogTitle>
+            <DialogDescription>
+              자주 사용하는 기능을 빠르게 실행할 수 있는 단축키 목록입니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* 사이드바 섹션 */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                사이드바
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+                  <span className="text-sm">사이드바 토글</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      Ctrl
+                    </kbd>
+                    <span className="text-xs">+</span>
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      B
+                    </kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 채팅 섹션 */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                채팅
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+                  <span className="text-sm">메시지 전송</span>
+                  <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                    Enter
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+                  <span className="text-sm">줄바꿈</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      Shift
+                    </kbd>
+                    <span className="text-xs">+</span>
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      Enter
+                    </kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+                  <span className="text-sm">채팅 최상단 이동</span>
+                  <div className="flex items-center gap-1">
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      Shift
+                    </kbd>
+                    <span className="text-xs">+</span>
+                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                      Tab
+                    </kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
+                  <span className="text-sm">채팅 최하단 이동</span>
+                  <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
+                    Tab
+                  </kbd>
+                </div>
+              </div>
+            </div>
+
+            {/* 참고 사항 */}
+            <div className="pt-4 border-t">
+              <p className="text-xs text-muted-foreground">
+                💡 Mac 사용자는 <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">Ctrl</kbd> 대신{" "}
+                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">Cmd</kbd>를 사용하세요.
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </SidebarProvider>
