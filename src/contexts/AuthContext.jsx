@@ -72,12 +72,11 @@ export const AuthProvider = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      const PUBLIC_SITE_URL = import.meta.env.VITE_SITE_URL; // VITE_ 접두사!
+
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // redirectTo: `${PUBLIC_SITE_URL}/auth/callback`, // 생 url 박기
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });

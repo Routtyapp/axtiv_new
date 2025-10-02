@@ -52,7 +52,7 @@ const MessageInput = ({
 
         if (isAiMode) {
           // AI 모드: 사용자 메시지를 먼저 보내고, AI 응답 생성
-          await onSend(messageContent, "user", uploadedFiles);
+          await onSend(messageContent, "user", uploadedFiles, true);
 
           try {
             // provider 판단
@@ -119,7 +119,7 @@ const MessageInput = ({
               );
 
               if (aiResponse) {
-                await onSend(aiResponse, "ai");
+                await onSend(aiResponse, "ai", [], true);
               }
 
               setIsStreaming(false);
@@ -127,7 +127,7 @@ const MessageInput = ({
               // OpenAI는 기존 방식 (스트리밍 X)
               const aiResponse = await generateResponse(messages, selectedModel);
               if (aiResponse) {
-                await onSend(aiResponse, "ai");
+                await onSend(aiResponse, "ai", [], true);
               }
             }
           } catch (error) {
@@ -135,12 +135,14 @@ const MessageInput = ({
             setIsStreaming(false);
             await onSend(
               "죄송합니다. AI 응답을 생성하는 중 오류가 발생했습니다.",
-              "ai"
+              "ai",
+              [],
+              true
             );
           }
         } else {
           // 일반 모드: 사용자 메시지만 보내기
-          await onSend(messageContent, "user", uploadedFiles);
+          await onSend(messageContent, "user", uploadedFiles, false);
         }
 
         // 전송 완료 후 초기화

@@ -49,7 +49,7 @@ const MessageList = ({ messages, currentUserId, streamingContent, isStreaming })
                         <div className="flex gap-2 max-w-[75%]">
                             <Avatar fallback="🤖" size="2" color="purple" />
                             <div className="flex flex-col gap-1">
-                                <p className="text-xs text-purple-600">Axi</p>
+                                <p className="text-xs text-purple-600">AXTI</p>
                                 <div className="px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
                                     {streamingContent ? (
                                         <>

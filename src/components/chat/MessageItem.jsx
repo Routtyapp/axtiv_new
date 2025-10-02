@@ -103,6 +103,10 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
             <div
                 className={`flex ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'} gap-2 max-w-[75%]`}
             >
+                {(!isOwnMessage || isAiMessage) && !showSender && (
+                    <div className="w-8 flex-shrink-0"></div>
+                )}
+
                 {(!isOwnMessage || isAiMessage) && showSender && (
                     <Avatar size="2">
                         {isAiMessage ? (
@@ -128,7 +132,7 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
                 >
                     {(!isOwnMessage || isAiMessage) && showSender && (
                         <p className={`text-sm px-1 ${isAiMessage ? 'text-purple-600' : 'text-gray-500'}`}>
-                            {isAiMessage ? 'Axi' : (message.sender_name || 'Anonymous')}
+                            {isAiMessage ? 'AXTI' : (message.sender_name || 'Anonymous')}
                         </p>
                     )}
 
@@ -158,10 +162,6 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
                                         />
                                     ) : (
                                         <p className="text-sm">{message.content}</p>
-                                    )}
-
-                                    {message._isOptimistic && (
-                                        <span className="text-xs text-gray-500 ml-2">📤</span>
                                     )}
                                 </div>
                                 {showTime && (
@@ -203,10 +203,6 @@ const MessageItem = ({ message, isOwnMessage, showSender, showTime }) => {
                         )}
                     </div>
                 </div>
-
-                {(!isOwnMessage || isAiMessage) && !showSender && (
-                    <div className="w-8"></div>
-                )}
             </div>
         </div>
     )

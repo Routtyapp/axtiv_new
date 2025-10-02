@@ -81,16 +81,19 @@ const ChatSidebar = ({
   }
 
   // 🎯 메시지 전송 핸들러 (스트리밍 상태 관리)
-  const handleSendMessage = async (content, messageType, files) => {
-    // 사용자 메시지일 때 스트리밍 초기화
-    if (messageType === "user") {
-      setStreamingContent("");
-      setIsStreaming(true);
-    }
-    // AI 메시지 완료 시 스트리밍 종료
-    else if (messageType === "ai") {
-      setIsStreaming(false);
-      setStreamingContent("");
+  const handleSendMessage = async (content, messageType, files, isAiMode = false) => {
+    // AI 모드일 때만 스트리밍 상태 관리
+    if (isAiMode) {
+      // 사용자 메시지일 때 스트리밍 초기화
+      if (messageType === "user") {
+        setStreamingContent("");
+        setIsStreaming(true);
+      }
+      // AI 메시지 완료 시 스트리밍 종료
+      else if (messageType === "ai") {
+        setIsStreaming(false);
+        setStreamingContent("");
+      }
     }
 
     // 실제 메시지 전송

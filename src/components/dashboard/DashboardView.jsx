@@ -71,10 +71,32 @@ const DashboardView = ({ workspaceId, workspace }) => {
     }
 
     const fetchRecentMessages = async () => {
+        // 먼저 사용자가 속한 채팅방 ID들을 조회
+        const { data: memberRooms, error: roomError } = await supabase
+            .from('chat_room_members')
+            .select('chat_room_id')
+            .eq('user_id', user.id)
+
+        if (roomError || !memberRooms || memberRooms.length === 0) {
+            setRecentMessages([])
+            return
+        }
+
+        const roomIds = memberRooms.map(room => room.chat_room_id)
+
+        // 해당 채팅방들의 최근 메시지 조회 (채팅방 이름 포함)
         const { data, error } = await supabase
             .from('chat_messages')
-            .select('id, content, sender_name, created_at')
+            .select(`
+                id,
+                content,
+                sender_name,
+                created_at,
+                chat_room_id,
+                chat_rooms!inner(name)
+            `)
             .eq('workspace_id', workspaceId)
+            .in('chat_room_id', roomIds)
             .order('created_at', { ascending: false })
             .limit(5)
 
@@ -262,7 +284,12 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                             </span>
                                         </div>
                                         <div className="flex-1">
-                                            <p className="text-sm font-medium text-gray-700">{message.sender_name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-gray-700">{message.sender_name}</p>
+                                                <Badge variant="outline" className="text-xs">
+                                                    #{message.chat_rooms?.name || '알 수 없음'}
+                                                </Badge>
+                                            </div>
                                             <p className="text-sm text-gray-600 mt-1 line-clamp-2">{message.content}</p>
                                             <p className="text-xs text-gray-500 mt-1">
                                                 {new Date(message.created_at).toLocaleDateString()} {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
