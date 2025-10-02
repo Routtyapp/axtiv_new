@@ -30,8 +30,7 @@ const MessageList = ({ messages, currentUserId, streamingContent, isStreaming })
                 {messages.map((message, index) => {
                     const previousMessage = messages[index - 1]
                     const showSender = !previousMessage || previousMessage.sender_id !== message.sender_id
-                    const showTime = !previousMessage ||
-                        new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() > 300000
+                    const showTime = true
 
                     return (
                         <MessageItem
@@ -50,7 +49,7 @@ const MessageList = ({ messages, currentUserId, streamingContent, isStreaming })
                         <div className="flex gap-2 max-w-[75%]">
                             <Avatar fallback="🤖" size="2" color="purple" />
                             <div className="flex flex-col gap-1">
-                                <p className="text-xs text-purple-600">AI Assistant</p>
+                                <p className="text-xs text-purple-600">Axi</p>
                                 <div className="px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
                                     {streamingContent ? (
                                         <>

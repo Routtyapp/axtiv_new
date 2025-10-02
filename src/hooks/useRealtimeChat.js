@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// AI Assistant 사용자 ID (환경 변수에서 로드)
+// Axi (AI Assistant) 사용자 ID (환경 변수에서 로드)
 const AI_ASSISTANT_AUTH_ID = import.meta.env.VITE_AI_ASSISTANT_AUTH_ID
 
 const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
@@ -30,6 +30,9 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                         file_type,
                         file_size,
                         storage_url
+                    ),
+                    users!chat_messages_sender_id_fkey (
+                        profile_image_url
                     )
                 `)
                 .eq('chat_room_id', chatRoomId)
@@ -41,10 +44,11 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 return
             }
 
-            // 메시지에 파일 정보를 files 배열로 변환
+            // 메시지에 파일 정보와 프로필 이미지를 변환
             const messagesWithFiles = (data || []).map(message => ({
                 ...message,
-                files: message.chat_files || []
+                files: message.chat_files || [],
+                sender_profile_image: message.users?.profile_image_url || null
             }))
 
             setMessages(messagesWithFiles)
@@ -125,7 +129,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
         // AI 메시지의 경우 sender 정보를 다르게 설정
         const senderInfo = messageType === 'ai'
-            ? { sender_id: AI_ASSISTANT_AUTH_ID, sender_name: 'AI Assistant' }
+            ? { sender_id: AI_ASSISTANT_AUTH_ID, sender_name: 'Axi' }
             : { sender_id: user.auth_id, sender_name: user.email?.split('@')[0] || user.user_metadata?.full_name || 'Anonymous' }
 
         const optimisticMessage = {

@@ -77,7 +77,8 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${PUBLIC_SITE_URL}/auth/callback`, // 콜백 경로 추가
+          // redirectTo: `${PUBLIC_SITE_URL}/auth/callback`, // 생 url 박기
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;

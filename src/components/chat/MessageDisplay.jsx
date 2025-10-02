@@ -11,25 +11,25 @@ export default function MessageDisplay({ message }) {
         <ReactMarkdown
           components={{
             h2: (props) => (
-              <h2 className="text-xl font-bold mt-4 mb-2" {...props} />
+              <h2 className="text-sm font-bold mt-2 mb-1" {...props} />
             ),
             h3: (props) => (
-              <h3 className="text-lg font-semibold mt-3 mb-2" {...props} />
+              <h3 className="text-sm font-semibold mt-1.5 mb-0.5" {...props} />
             ),
             ul: (props) => (
-              <ul className="list-disc ml-5 my-2 space-y-1" {...props} />
+              <ul className="list-disc ml-5 my-1 space-y-0.5 text-sm" {...props} />
             ),
             ol: (props) => (
-              <ol className="list-decimal ml-5 my-2 space-y-1" {...props} />
+              <ol className="list-decimal ml-5 my-1 space-y-0.5 text-sm" {...props} />
             ),
             code: ({ inline, ...props }) =>
               inline ? (
                 <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm" {...props} />
               ) : (
-                <code className="block bg-gray-900 text-white p-3 rounded my-2" {...props} />
+                <code className="block bg-gray-900 text-white p-2 rounded my-1.5 text-sm" {...props} />
               ),
             p: (props) => (
-              <p className="my-2 leading-relaxed" {...props} />
+              <p className="leading-relaxed text-sm" {...props} />
             ),
           }}
         >

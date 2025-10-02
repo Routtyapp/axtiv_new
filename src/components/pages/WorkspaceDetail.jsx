@@ -100,6 +100,10 @@ const WorkspaceDetail = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showKeyboardShortcutsDialog, setShowKeyboardShortcutsDialog] = useState(false);
   const dropdownRef = useRef(null);
+  const [selectedProfileImage, setSelectedProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
 
   // 회의가 있는 날짜들을 계산
   const meetingDates = useMemo(() => {
@@ -302,17 +306,96 @@ const WorkspaceDetail = () => {
       bio: currentUserProfile?.bio || '',
       status: currentUserProfile?.status || 'available',
     });
+    setProfileImagePreview(currentUserProfile?.profile_image_url || null);
+    setSelectedProfileImage(null);
+  };
+
+  const handleProfileImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 파일 타입 검증
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('JPG, PNG, WEBP 형식의 이미지만 업로드 가능합니다.');
+      return;
+    }
+
+    // 파일 크기 검증 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('이미지 크기는 5MB 이하여야 합니다.');
+      return;
+    }
+
+    setSelectedProfileImage(file);
+
+    // 미리보기 생성
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveProfileImage = () => {
+    setSelectedProfileImage(null);
+    setProfileImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleCancelEdit = () => {
     setIsEditingProfile(false);
     setEditingProfileData(null);
+    setSelectedProfileImage(null);
+    setProfileImagePreview(null);
   };
 
   const handleSaveProfile = async () => {
     if (!user?.id || !editingProfileData) return;
 
     try {
+      setUploadingImage(true);
+      let profileImageUrl = currentUserProfile?.profile_image_url;
+
+      // 이미지가 선택되었으면 업로드
+      if (selectedProfileImage) {
+        // 기존 이미지가 있으면 삭제
+        if (currentUserProfile?.profile_image_url) {
+          const oldPath = currentUserProfile.profile_image_url.split('/').pop();
+          await supabase.storage
+            .from('profile-images')
+            .remove([oldPath]);
+        }
+
+        // 새 이미지 업로드
+        const fileExt = selectedProfileImage.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('profile-images')
+          .upload(fileName, selectedProfileImage, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          alert('이미지 업로드 중 오류가 발생했습니다.');
+          setUploadingImage(false);
+          return;
+        }
+
+        // Public URL 가져오기
+        const { data: urlData } = supabase.storage
+          .from('profile-images')
+          .getPublicUrl(fileName);
+
+        profileImageUrl = urlData.publicUrl;
+      }
+
+      // 프로필 정보 업데이트
       const { error } = await supabase
         .from('users')
         .update({
@@ -321,12 +404,14 @@ const WorkspaceDetail = () => {
           position: editingProfileData.position || null,
           bio: editingProfileData.bio || null,
           status: editingProfileData.status,
+          profile_image_url: profileImageUrl,
         })
         .eq('auth_id', user.id);
 
       if (error) {
         console.error('Error updating profile:', error);
         alert('프로필 업데이트 중 오류가 발생했습니다.');
+        setUploadingImage(false);
         return;
       }
 
@@ -334,10 +419,14 @@ const WorkspaceDetail = () => {
       await fetchCurrentUserProfile();
       setIsEditingProfile(false);
       setEditingProfileData(null);
+      setSelectedProfileImage(null);
+      setProfileImagePreview(null);
       alert('프로필이 성공적으로 업데이트되었습니다.');
     } catch (error) {
       console.error('Error saving profile:', error);
       alert('프로필 저장 중 오류가 발생했습니다.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -798,13 +887,21 @@ const WorkspaceDetail = () => {
               <div className="flex items-center gap-3 min-h-[40px]">
                 <div className="relative flex-shrink-0">
                   <Avatar>
-                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
-                      {currentUserProfile?.user_name
-                        ?.charAt(0)
-                        .toUpperCase() ||
-                        user?.email?.charAt(0).toUpperCase() ||
-                        "U"}
-                    </AvatarFallback>
+                    {currentUserProfile?.profile_image_url ? (
+                      <img
+                        src={currentUserProfile.profile_image_url}
+                        alt={currentUserProfile.user_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
+                        {currentUserProfile?.user_name
+                          ?.charAt(0)
+                          .toUpperCase() ||
+                          user?.email?.charAt(0).toUpperCase() ||
+                          "U"}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   {currentUserProfile?.is_online && (
                     <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -903,7 +1000,7 @@ const WorkspaceDetail = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg [&>button]:hidden">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto [&>button]:hidden">
           <DialogHeader className="relative">
             <DialogTitle>프로필</DialogTitle>
             <DialogDescription>
@@ -973,9 +1070,9 @@ const WorkspaceDetail = () => {
                 <div className="flex items-start gap-3">
                   <div className="relative">
                     <Avatar className="w-16 h-16">
-                      {currentUserProfile.profile_image_url ? (
+                      {(isEditingProfile ? profileImagePreview : currentUserProfile.profile_image_url) ? (
                         <img
-                          src={currentUserProfile.profile_image_url}
+                          src={isEditingProfile ? profileImagePreview : currentUserProfile.profile_image_url}
                           alt={currentUserProfile.user_name}
                           className="w-full h-full object-cover"
                         />
@@ -985,9 +1082,23 @@ const WorkspaceDetail = () => {
                         </AvatarFallback>
                       )}
                     </Avatar>
-                    {currentUserProfile.is_online && (
+                    {isEditingProfile && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full cursor-pointer hover:bg-black/60 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Pencil className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                    {!isEditingProfile && currentUserProfile.is_online && (
                       <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
                     )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={handleProfileImageChange}
+                      className="hidden"
+                    />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold mb-1">

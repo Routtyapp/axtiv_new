@@ -14,7 +14,7 @@ const generateOpenAIResponse = async (userMessages, model) => {
   console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 
   try {
-    const response = await client.responses.create({
+    const requestConfig = {
       model: model,
       input: userMessages,
       tools: [
@@ -24,9 +24,15 @@ const generateOpenAIResponse = async (userMessages, model) => {
           vector_store_ids: [import.meta.env.VITE_VECTOR_STORE_ID],
         },
       ],
-      reasoning: { effort: "low" },
-      text: { verbosity: "low" },
-    });
+    };
+
+    // GPT-5만 reasoning과 text 파라미터 지원
+    if (model === "gpt-5") {
+      requestConfig.reasoning = { effort: "low" };
+      requestConfig.text = { verbosity: "low" };
+    }
+
+    const response = await client.responses.create(requestConfig);
 
     console.log(response.output_text);
     return response.output_text;
