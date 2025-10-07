@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from './useAuth'
 import userStore from '../store/userStore'
 import { normalizeUser, isValidUser } from '../types/user.types'
 import {

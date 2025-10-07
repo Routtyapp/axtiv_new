@@ -60,7 +60,7 @@ const ShareMeetingDialog = ({
             const { data, error } = await supabase
                 .from('users')
                 .select('email')
-                .eq('auth_id', currentUserId)
+                .eq('user_id', currentUserId)
                 .single()
 
             if (!error && data) {

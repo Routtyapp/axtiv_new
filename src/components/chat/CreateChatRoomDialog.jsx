@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Dialog, Input, Button, Badge } from '../ui'
 import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 import { Users, X } from 'lucide-react'
 
 const CreateChatRoomDialog = ({

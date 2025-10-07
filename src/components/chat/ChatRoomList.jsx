@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Hash, Users, Clock, Plus } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { Button, Badge } from "../ui";
@@ -15,115 +15,39 @@ const ChatRoomList = ({
   const [loading, setLoading] = useState(true);
   const { canCreateRoom } = useWorkspacePermissions(workspaceId);
 
-  // 채널 레퍼런스 관리
-  const channelRef = useRef(null);
-  const isVisibleRef = useRef(true);
-
   const fetchChatRooms = useCallback(async () => {
     if (!workspaceId || !currentUserId) return;
 
     try {
-      // 한 번의 쿼리로 모든 정보 가져오기
-      const roomIds = await supabase
-        .from("chat_rooms")
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .eq("is_active", true)
-        .eq("is_direct_message", false);
+      // 🚀 최적화: 5개 쿼리 → 1개 RPC 함수 호출로 변경
+      const { data, error } = await supabase.rpc('get_chat_rooms_optimized', {
+        p_workspace_id: workspaceId,
+        p_user_id: currentUserId
+      });
 
-      if (!roomIds.data || roomIds.data.length === 0) {
+      if (error) {
+        console.error("Error fetching chat rooms:", error);
         setChatRooms([]);
         return;
       }
 
-      const ids = roomIds.data.map(r => r.id);
-
-      // 병렬로 데이터 가져오기 (각 타입당 1개 쿼리만)
-      const [roomsRes, membersRes, readStatusRes] = await Promise.all([
-        supabase
-          .from("chat_rooms")
-          .select("id, name, description, is_default, created_at, updated_at")
-          .in("id", ids)
-          .order("is_default", { ascending: false })
-          .order("created_at", { ascending: true }),
-
-        supabase
-          .from("chat_room_members")
-          .select("chat_room_id, user_id")
-          .in("chat_room_id", ids),
-
-        supabase
-          .from("chat_read_status")
-          .select("chat_room_id, last_read_at")
-          .in("chat_room_id", ids)
-          .eq("user_id", currentUserId)
-      ]);
-
-      if (roomsRes.error) {
-        console.error("Error fetching rooms:", roomsRes.error);
-        return;
-      }
-
-      // ✅ 최적화: 단일 쿼리로 모든 unread count 가져오기
-      const unreadCounts = {};
-
-      // 읽음 상태가 있는 방들과 없는 방들을 분리
-      const roomsWithRead = (readStatusRes.data || []).map(r => ({
-        roomId: r.chat_room_id,
-        lastReadAt: r.last_read_at
+      // 데이터 변환 (camelCase로)
+      const roomsWithInfo = (data || []).map(room => ({
+        id: room.id,
+        name: room.name,
+        description: room.description,
+        is_default: room.is_default,
+        created_at: room.created_at,
+        updated_at: room.updated_at,
+        memberCount: Number(room.member_count),
+        unreadCount: Number(room.unread_count),
+        lastActivity: room.last_activity ? new Date(room.last_activity) : null,
       }));
-      const roomsWithoutRead = ids.filter(id => !roomsWithRead.find(r => r.roomId === id));
-
-      // 읽음 상태가 있는 방들의 unread count (단일 쿼리)
-      if (roomsWithRead.length > 0) {
-        const countsPromises = roomsWithRead.map(async ({ roomId, lastReadAt }) => {
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("id", { count: "exact", head: true })
-            .eq("chat_room_id", roomId)
-            .gt("created_at", lastReadAt)
-            .neq("sender_id", currentUserId);
-          return { roomId, count: count || 0 };
-        });
-
-        const counts = await Promise.all(countsPromises);
-        counts.forEach(({ roomId, count }) => {
-          unreadCounts[roomId] = count;
-        });
-      }
-
-      // 읽음 상태가 없는 방들의 전체 메시지 count (단일 쿼리)
-      if (roomsWithoutRead.length > 0) {
-        const countsPromises = roomsWithoutRead.map(async (roomId) => {
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("id", { count: "exact", head: true })
-            .eq("chat_room_id", roomId)
-            .neq("sender_id", currentUserId);
-          return { roomId, count: count || 0 };
-        });
-
-        const counts = await Promise.all(countsPromises);
-        counts.forEach(({ roomId, count }) => {
-          unreadCounts[roomId] = count;
-        });
-      }
-
-      // 데이터 병합 (lastActivity는 realtime으로 업데이트)
-      const roomsWithInfo = (roomsRes.data || []).map(room => {
-        const members = (membersRes.data || []).filter(m => m.chat_room_id === room.id);
-
-        return {
-          ...room,
-          memberCount: members.length,
-          lastActivity: null, // Realtime으로 업데이트
-          unreadCount: unreadCounts[room.id] || 0,
-        };
-      });
 
       setChatRooms(roomsWithInfo);
     } catch (error) {
       console.error("Error fetching chat rooms:", error);
+      setChatRooms([]);
     } finally {
       setLoading(false);
     }
@@ -173,135 +97,6 @@ const ChatRoomList = ({
   useEffect(() => {
     fetchChatRooms();
   }, [fetchChatRooms]);
-
-  // Optimistic update 함수들
-  const incrementUnreadCount = useCallback((roomId) => {
-    setChatRooms(prev =>
-      prev.map(room =>
-        room.id === roomId
-          ? { ...room, unreadCount: (room.unreadCount || 0) + 1, lastActivity: new Date() }
-          : room
-      )
-    );
-  }, []);
-
-  const resetUnreadCount = useCallback((roomId) => {
-    setChatRooms(prev =>
-      prev.map(room =>
-        room.id === roomId
-          ? { ...room, unreadCount: 0 }
-          : room
-      )
-    );
-  }, []);
-
-  // 메시지 INSERT 핸들러 - optimistic update
-  const handleMessageInsert = useCallback((payload) => {
-    const { chat_room_id, sender_id } = payload.new;
-
-    // 자신이 보낸 메시지가 아닌 경우에만 unread count 증가
-    if (sender_id !== currentUserId) {
-      incrementUnreadCount(chat_room_id);
-    }
-  }, [currentUserId, incrementUnreadCount]);
-
-  // 읽음 상태 변경 핸들러 - optimistic update
-  const handleReadStatusChange = useCallback((payload) => {
-    const { chat_room_id, user_id } = payload.new;
-
-    // 자신의 읽음 상태 변경인 경우에만 unread count 리셋
-    if (user_id === currentUserId) {
-      resetUnreadCount(chat_room_id);
-    }
-  }, [currentUserId, resetUnreadCount]);
-
-  // 채널 정리 함수
-  const cleanupChannel = useCallback(() => {
-    if (channelRef.current) {
-      console.log('🧹 ChatRoomList 채널 정리');
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-  }, []);
-
-  // 채널 구독 함수
-  const setupChannel = useCallback(() => {
-    if (!isVisibleRef.current) {
-      console.log('💤 백그라운드 탭 - 구독 생략');
-      return;
-    }
-
-    cleanupChannel();
-
-    const channelName = `workspace:${workspaceId}:activity`;
-
-    const channel = supabase
-      .channel(channelName, {
-        config: {
-          presence: { key: currentUserId },
-          private: true
-        }
-      })
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `workspace_id=eq.${workspaceId}`
-        },
-        handleMessageInsert
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_read_status",
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        handleReadStatusChange
-      )
-      .subscribe((status) => {
-        console.log(`📡 ChatRoomList 채널 상태: ${status}`);
-      });
-
-    channelRef.current = channel;
-  }, [workspaceId, currentUserId, handleMessageInsert, handleReadStatusChange, cleanupChannel]);
-
-  // 실시간 구독 - workspace별 단일 채널
-  useEffect(() => {
-    if (!workspaceId || !currentUserId) return;
-
-    // Page Visibility API
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('👁️ ChatRoomList 백그라운드 전환');
-        isVisibleRef.current = false;
-        cleanupChannel();
-      } else {
-        console.log('👁️ ChatRoomList 포그라운드 복귀');
-        isVisibleRef.current = true;
-        // 랜덤 딜레이로 reconnection storm 방지
-        setTimeout(() => {
-          if (isVisibleRef.current) {
-            setupChannel();
-          }
-        }, 500 + Math.random() * 500);
-      }
-    };
-
-    // 초기 구독
-    setupChannel();
-
-    // Visibility 이벤트 등록
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      cleanupChannel();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [workspaceId, currentUserId, setupChannel, cleanupChannel]);
 
   // 헬퍼 함수들
   const formatLastActivity = (date) => {
@@ -363,9 +158,7 @@ const ChatRoomList = ({
                 )}
               </div>
               {room.unreadCount > 0 && (
-                <Badge variant="destructive" className="h-5 text-xs">
-                  {room.unreadCount > 99 ? "99+" : room.unreadCount}
-                </Badge>
+                <div className="h-2 w-2 bg-red-500 rounded-full" title="새 메시지" />
               )}
             </div>
 

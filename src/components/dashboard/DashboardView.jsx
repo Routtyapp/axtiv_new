@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../../lib/supabase"
-import { useAuth } from "../../contexts/AuthContext"
+import { useAuth } from "../../hooks/useAuth"
 import { Card, Badge, Avatar, AvatarFallback, ScrollArea, Dialog, DialogContent, DialogHeader, DialogTitle, Separator, Tooltip, TooltipTrigger, TooltipContent } from '../ui'
 import { Users, Calendar as CalendarIcon, MessageCircle, TrendingUp, Mail, Shield, Clock } from 'lucide-react'
 
@@ -21,101 +21,36 @@ const DashboardView = ({ workspaceId, workspace }) => {
 
     const fetchDashboardData = async () => {
         try {
-            await Promise.all([
-                fetchTeamMembers(),
-                fetchRecentMessages(),
-                fetchUpcomingMeetings()
-            ])
+            // 🚀 최적화: 4개 쿼리 → 1개 RPC 함수 호출로 변경
+            const { data, error } = await supabase.rpc('get_dashboard_data', {
+                p_workspace_id: workspaceId,
+                p_user_id: user.id
+            })
+
+            if (error) {
+                console.error('Error fetching dashboard data:', error)
+                return
+            }
+
+            // 데이터 파싱 및 상태 업데이트
+            if (data) {
+                // 팀 멤버
+                setTeamMembers(data.teamMembers || [])
+
+                // 최근 메시지 (chat_rooms 구조 맞추기)
+                const messages = (data.recentMessages || []).map(msg => ({
+                    ...msg,
+                    chat_rooms: { name: msg.chat_room_name }
+                }))
+                setRecentMessages(messages)
+
+                // 예정된 회의
+                setUpcomingMeetings(data.upcomingMeetings || [])
+            }
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {
             setLoading(false)
-        }
-    }
-
-    const fetchTeamMembers = async () => {
-        const { data, error } = await supabase
-            .from('workspace_members')
-            .select(`
-                user_id,
-                role,
-                is_online,
-                last_seen,
-                joined_at,
-                users!inner (
-                    user_id,
-                    user_name,
-                    email,
-                    user_role,
-                    last_sign_in_at
-                )
-            `)
-            .eq('workspace_id', workspaceId)
-            .order('is_online', { ascending: false })
-            .order('last_seen', { ascending: false })
-
-        if (!error && data) {
-            const members = data.map(m => ({
-                user_id: m.users.user_id,
-                user_name: m.users.user_name,
-                email: m.users.email,
-                user_role: m.users.user_role,
-                last_sign_in_at: m.users.last_sign_in_at,
-                workspace_role: m.role,
-                is_online: m.is_online,
-                last_seen: m.last_seen,
-                joined_at: m.joined_at
-            }))
-            setTeamMembers(members)
-        }
-    }
-
-    const fetchRecentMessages = async () => {
-        // 먼저 사용자가 속한 채팅방 ID들을 조회
-        const { data: memberRooms, error: roomError } = await supabase
-            .from('chat_room_members')
-            .select('chat_room_id')
-            .eq('user_id', user.id)
-
-        if (roomError || !memberRooms || memberRooms.length === 0) {
-            setRecentMessages([])
-            return
-        }
-
-        const roomIds = memberRooms.map(room => room.chat_room_id)
-
-        // 해당 채팅방들의 최근 메시지 조회 (채팅방 이름 포함)
-        const { data, error } = await supabase
-            .from('chat_messages')
-            .select(`
-                id,
-                content,
-                sender_name,
-                created_at,
-                chat_room_id,
-                chat_rooms!inner(name)
-            `)
-            .eq('workspace_id', workspaceId)
-            .in('chat_room_id', roomIds)
-            .order('created_at', { ascending: false })
-            .limit(5)
-
-        if (!error && data) {
-            setRecentMessages(data)
-        }
-    }
-
-    const fetchUpcomingMeetings = async () => {
-        const { data, error } = await supabase
-            .from('meetings')
-            .select('id, title, start_time, location')
-            .eq('workspace_id', workspaceId)
-            .gte('start_time', new Date().toISOString())
-            .order('start_time', { ascending: true })
-            .limit(3)
-
-        if (!error && data) {
-            setUpcomingMeetings(data)
         }
     }
 
@@ -147,8 +82,6 @@ const DashboardView = ({ workspaceId, workspace }) => {
         )
     }
 
-    const onlineMembers = teamMembers.filter(m => m.is_online)
-
     return (
         <div className="flex flex-col h-full">
             <div className="p-6 border-b flex-shrink-0">
@@ -164,12 +97,10 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <Card className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">온라인 멤버</p>
-                                <p className="text-2xl font-bold">{onlineMembers.length} / {teamMembers.length}</p>
+                                <p className="text-sm text-gray-600">전체 멤버</p>
+                                <p className="text-2xl font-bold">{teamMembers.length}</p>
                             </div>
-                            <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <div className="h-4 w-4 bg-green-500 rounded-full"></div>
-                            </div>
+                            <Users className="h-8 w-8 text-blue-500" />
                         </div>
                     </Card>
 
@@ -212,16 +143,11 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                                 onClick={() => handleMemberClick(member)}
                                                 className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                                             >
-                                                <div className="relative">
-                                                    <Avatar>
-                                                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
-                                                            {member.user_name?.charAt(0).toUpperCase() || 'U'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    {member.is_online && (
-                                                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                                                    )}
-                                                </div>
+                                                <Avatar>
+                                                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
+                                                        {member.user_name?.charAt(0).toUpperCase() || 'U'}
+                                                    </AvatarFallback>
+                                                </Avatar>
 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
@@ -241,16 +167,6 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                                     </div>
                                                     <p className="text-xs text-gray-500 truncate">
                                                         {member.email}
-                                                    </p>
-                                                </div>
-
-                                                <div className="text-right">
-                                                    <p className="text-xs text-gray-500">
-                                                        {member.is_online ? (
-                                                            <span className="text-green-600 font-medium">온라인</span>
-                                                        ) : (
-                                                            formatLastSeen(member.last_seen)
-                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -368,16 +284,11 @@ const DashboardView = ({ workspaceId, workspace }) => {
                         <div className="space-y-6">
                             {/* 프로필 헤더 */}
                             <div className="flex items-center gap-4">
-                                <div className="relative">
-                                    <Avatar className="w-16 h-16">
-                                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white text-2xl font-bold">
-                                            {selectedMember.user_name?.charAt(0).toUpperCase() || 'U'}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    {selectedMember.is_online && (
-                                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                                    )}
-                                </div>
+                                <Avatar className="w-16 h-16">
+                                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white text-2xl font-bold">
+                                        {selectedMember.user_name?.charAt(0).toUpperCase() || 'U'}
+                                    </AvatarFallback>
+                                </Avatar>
                                 <div className="flex-1">
                                     <h3 className="text-lg font-semibold">{selectedMember.user_name}</h3>
                                     <div className="flex items-center gap-2 mt-1">
@@ -418,22 +329,6 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                         <p className="text-sm text-gray-600">워크스페이스 역할</p>
                                         <p className="text-sm font-medium">
                                             {selectedMember.workspace_role === 'admin' ? '관리자' : '일반 멤버'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-3">
-                                    <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
-                                    <div className="flex-1">
-                                        <p className="text-sm text-gray-600">상태</p>
-                                        <p className="text-sm font-medium">
-                                            {selectedMember.is_online ? (
-                                                <span className="text-green-600">🟢 온라인</span>
-                                            ) : (
-                                                <span className="text-gray-600">
-                                                    ⚫ 오프라인 · 마지막 접속: {formatLastSeen(selectedMember.last_seen)}
-                                                </span>
-                                            )}
                                         </p>
                                     </div>
                                 </div>

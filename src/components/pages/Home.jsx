@@ -1,29 +1,66 @@
+/**
+ * Home.jsx - 랜딩 페이지 (메인 홈페이지)
+ *
+ * 역할:
+ * - 애플리케이션 소개 및 마케팅 페이지
+ * - 로그인된 사용자와 비로그인 사용자 다른 UI 표시
+ * - AuthContext를 통한 안전한 세션 사용
+ *
+ * 상호작용:
+ * - Import:
+ *   - hooks/useAuth (안전한 세션 접근)
+ *   - store/userStore (Zustand 전역 스토어)
+ *   - components/layout/TopHeader (상단 네비게이션)
+ *   - components/ui/ripple (배경 애니메이션)
+ * - Export: Home (default)
+ * - 사용처: App.jsx (/ 루트 경로)
+ * - DB: users 테이블 (user_id로 사용자 정보 조회)
+ *
+ * UI 분기:
+ * - authLoading=true: 로딩 중
+ * - user 있음: "시작하기" 버튼 → /companies
+ * - user 없음: "내 프로젝트로 이동" + "AI 도구 사용하기" → /login
+ *
+ * 데이터 흐름:
+ * 1. useAuth로 AuthContext에서 안전하게 세션 가져오기
+ * 2. authUser.id로 users 테이블 쿼리
+ * 3. userStore에 사용자 정보 저장
+ * 4. UI 렌더링 (로그인 여부에 따라 다름)
+ *
+ * ⚠️ 중요: localStorage 직접 접근 제거됨 (보안 강화)
+ * - Before: localStorage.getItem + JSON.parse (에러 위험)
+ * - After: useAuth 훅 사용 (안전)
+ */
+
 import { useEffect } from "react";
 import { Link } from "react-router";
 import { Flex, Heading, Text } from "@radix-ui/themes";
-import { supabase } from "../../lib/supabase";
-import userStore from "../../store/userStore";
+import { supabase } from "../../lib/supabase";  // Supabase 클라이언트
+import userStore from "../../store/userStore";  // Zustand 스토어
+import { useAuth } from "../../hooks/useAuth";  // 안전한 세션 접근
 import { Button, Badge } from "../ui";
 import { Container, TopHeader } from "../layout";
-import { Ripple } from "@/components/ui/ripple";
+import { Ripple } from "@/components/ui/ripple";  // 배경 애니메이션 효과
 
 const Home = () => {
-  const { user, setUser } = userStore();
+  const { user, setUser } = userStore();  // Zustand 전역 스토어
+  const { user: authUser, loading: authLoading } = useAuth();  // AuthContext에서 세션 가져오기
 
   useEffect(() => {
-    const userData = localStorage.getItem("sb-nhvhujoentbvkgpanwwg-auth-token");
-    const parsedUser = JSON.parse(userData);
-    const userId = parsedUser?.user.id;
+    // 🔐 AuthContext를 통한 안전한 세션 사용 (localStorage 직접 접근 제거)
+    if (authLoading) return;  // 인증 로딩 중이면 대기
+
+    const userId = authUser?.id;
 
     if (userId) getUserData(userId);
     else console.log("No user ID found");
-  }, []);
+  }, [authUser, authLoading]);
 
   const getUserData = async (userId) => {
     const { data, error } = await supabase
       .from("users")
       .select("*")
-      .eq("auth_id", userId)
+      .eq("user_id", userId)
       .single();
 
     if (error) {

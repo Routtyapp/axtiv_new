@@ -25,7 +25,7 @@ import {
   Check,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import {
   Button,
   Card,
@@ -229,11 +229,67 @@ const WorkspaceDetail = () => {
 
   useEffect(() => {
     if (companyId && workspaceId && user && !authLoading) {
-      fetchWorkspaceAndCompany();
-      fetchMeetings();
-      fetchCurrentUserProfile();
+      // 🚀 최적화: 모든 초기 데이터를 한 번에 로드
+      fetchInitialData();
     }
   }, [companyId, workspaceId, user, authLoading]);
+
+  // 🚀 최적화: 초기 데이터를 한 번에 로드
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase.rpc('get_workspace_initial_data', {
+        p_workspace_id: workspaceId,
+        p_company_id: companyId,
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error fetching initial data:', error);
+        return;
+      }
+
+      if (data) {
+        // 워크스페이스 설정
+        setWorkspace(data.workspace);
+
+        // 회사 정보 설정
+        setCompany(data.company);
+
+        // 사용자 프로필 설정
+        if (data.userProfile) {
+          setCurrentUserProfile(data.userProfile);
+        }
+
+        // 회의 목록 설정
+        setMeetings(data.meetings || []);
+
+        // 🆕 기본 채팅방 설정 (새로고침 시 chatRoomId null 방지)
+        const { data: defaultRoom, error: chatRoomError } = await supabase
+          .from("chat_rooms")
+          .select("id, name, is_default")
+          .eq("workspace_id", workspaceId)
+          .eq("is_default", true)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (chatRoomError) {
+          console.error("Error fetching default chat room:", chatRoomError);
+        } else if (defaultRoom) {
+          setSelectedChatRoom({
+            id: defaultRoom.id,
+            name: defaultRoom.name,
+            is_default: defaultRoom.is_default,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchCurrentUserProfile = async () => {
     if (!workspaceId || !user?.id) return;
@@ -242,7 +298,7 @@ const WorkspaceDetail = () => {
       // workspace_members에서 워크스페이스 관련 정보만 조회
       const { data: memberData, error: memberError } = await supabase
         .from("workspace_members")
-        .select("role, is_online, last_seen, joined_at")
+        .select("role, joined_at")
         .eq("workspace_id", workspaceId)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -278,8 +334,6 @@ const WorkspaceDetail = () => {
           bio: userData.bio,
           status: userData.status,
           workspace_role: memberData.role,
-          is_online: memberData.is_online,
-          last_seen: memberData.last_seen,
           joined_at: memberData.joined_at,
         };
         setCurrentUserProfile(userProfile);
@@ -463,76 +517,8 @@ const WorkspaceDetail = () => {
     return date.toLocaleDateString("ko-KR");
   };
 
-  // 워크스페이스 로드 후 기본 채팅방 설정
-  useEffect(() => {
-    const fetchDefaultChatRoom = async () => {
-      if (!workspace || !workspaceId || selectedChatRoom) return;
 
-      try {
-        // 기본 채팅방 조회
-        const { data: defaultRoom, error } = await supabase
-          .from("chat_rooms")
-          .select("id, name, is_default")
-          .eq("workspace_id", workspaceId)
-          .eq("is_default", true)
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error fetching default chat room:", error);
-          return;
-        }
-
-        // 기본 채팅방이 있으면 선택
-        if (defaultRoom) {
-          setSelectedChatRoom({
-            id: defaultRoom.id,
-            name: defaultRoom.name,
-            is_default: defaultRoom.is_default,
-          });
-        }
-      } catch (error) {
-        console.error("Error in fetchDefaultChatRoom:", error);
-      }
-    };
-
-    fetchDefaultChatRoom();
-  }, [workspace, workspaceId, selectedChatRoom]);
-
-  const fetchWorkspaceAndCompany = async () => {
-    try {
-      const { data: workspaceData, error: workspaceError } = await supabase
-        .from("workspace")
-        .select("*")
-        .eq("id", workspaceId)
-        .single();
-
-      if (workspaceError) {
-        console.error("Error fetching workspace:", workspaceError.message);
-        return;
-      }
-
-      setWorkspace(workspaceData);
-
-      const { data: companyData, error: companyError } = await supabase
-        .from("company")
-        .select("*")
-        .eq("id", companyId)
-        .single();
-
-      if (companyError) {
-        console.error("Error fetching company:", companyError.message);
-        return;
-      }
-
-      setCompany(companyData);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // fetchMeetings는 회의 생성/수정 후 재조회 시에만 사용
   const fetchMeetings = async () => {
     try {
       const { data: meetingData, error: meetingError } = await supabase
@@ -902,9 +888,6 @@ const WorkspaceDetail = () => {
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  {currentUserProfile?.is_online && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
@@ -1083,9 +1066,6 @@ const WorkspaceDetail = () => {
                         <Pencil className="h-5 w-5 text-white" />
                       </div>
                     )}
-                    {!isEditingProfile && currentUserProfile.is_online && (
-                      <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
-                    )}
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -1146,13 +1126,6 @@ const WorkspaceDetail = () => {
                         )
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {currentUserProfile.is_online ? (
-                        <span className="text-green-600 dark:text-green-400">● 온라인</span>
-                      ) : (
-                        <span>⚫ 오프라인 · {formatLastSeen(currentUserProfile.last_seen)}</span>
-                      )}
-                    </p>
                   </div>
                 </div>
 

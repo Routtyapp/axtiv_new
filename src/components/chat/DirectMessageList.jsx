@@ -16,8 +16,6 @@ const DirectMessageList = ({ workspaceId, currentUserId, currentUserEmail, onUse
                 .from('workspace_members')
                 .select(`
                     user_id,
-                    is_online,
-                    last_seen,
                     users!workspace_members_user_id_fkey (
                         email
                     )
@@ -33,8 +31,6 @@ const DirectMessageList = ({ workspaceId, currentUserId, currentUserEmail, onUse
             // 데이터 변환
             const membersWithDetails = (membersWithUsers || []).map(member => ({
                 user_id: member.user_id,
-                is_online: member.is_online,
-                last_seen: member.last_seen,
                 email: member.users?.email || member.user_id,
                 displayName: member.users?.email?.split('@')[0] || 'Unknown User'
             }))
