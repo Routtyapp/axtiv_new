@@ -43,7 +43,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                 last_seen,
                 joined_at,
                 users!inner (
-                    auth_id,
+                    user_id,
                     user_name,
                     email,
                     user_role,
@@ -56,7 +56,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
 
         if (!error && data) {
             const members = data.map(m => ({
-                auth_id: m.users.auth_id,
+                user_id: m.users.user_id,
                 user_name: m.users.user_name,
                 email: m.users.email,
                 user_role: m.users.user_role,
@@ -206,7 +206,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                         <ScrollArea className="h-80">
                             <div className="space-y-2 pr-4">
                                 {teamMembers.map((member) => (
-                                    <Tooltip key={member.auth_id}>
+                                    <Tooltip key={member.user_id}>
                                         <TooltipTrigger asChild>
                                             <div
                                                 onClick={() => handleMemberClick(member)}

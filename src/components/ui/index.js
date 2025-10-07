@@ -29,5 +29,4 @@ export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, Tabl
 export { Textarea } from './textarea'
 export { Toggle, toggleVariants } from './toggle'
 export { ToggleGroup, ToggleGroupItem } from './toggle-group'
-export { Pointer } from './pointer'
 export { AnimatedThemeToggler } from './animated-theme-toggler'

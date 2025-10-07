@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Skeleton, Alert, AlertDescription } from "../ui";
 import { useUser } from "../../hooks/useUser";
 import useRealtimeChat from "../../hooks/useRealtimeChat";
@@ -16,8 +16,20 @@ const ChatSidebar = ({
   onLeaveChatRoom,
 }) => {
   const { user, isAuthenticated, getId } = useUser();
+
+  // user 객체 안정화 - 필요한 속성만 메모이제이션
+  const stableUser = useMemo(() => {
+    if (!user) return null;
+    return {
+      user_id: user.user_id || user.id,
+      email: user.email,
+      user_metadata: user.user_metadata
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.user_id, user?.id, user?.email]);
+
   const { messages, loading, error, sendMessage, realtimeStatus } =
-    useRealtimeChat(workspaceId, user, chatRoomId);
+    useRealtimeChat(workspaceId, stableUser, chatRoomId);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // 🎯 스트리밍 상태 추가

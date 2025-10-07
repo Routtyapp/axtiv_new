@@ -57,7 +57,6 @@ import {
   Separator,
   TooltipTrigger,
   TooltipContent,
-  Pointer,
   AnimatedThemeToggler,
   Input,
   Textarea,
@@ -256,8 +255,8 @@ const WorkspaceDetail = () => {
       // users 테이블에서 사용자 정보 조회
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("auth_id, user_name, email, user_role, last_sign_in_at, phone, profile_image_url, department, position, bio, status")
-        .eq("auth_id", user.id)
+        .select("user_id, user_name, email, user_role, last_sign_in_at, phone, profile_image_url, department, position, bio, status")
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (userError) {
@@ -267,7 +266,7 @@ const WorkspaceDetail = () => {
 
       if (memberData && userData) {
         const userProfile = {
-          auth_id: userData.auth_id,
+          user_id: userData.user_id,
           user_name: userData.user_name,
           email: userData.email,
           user_role: userData.user_role,
@@ -406,7 +405,7 @@ const WorkspaceDetail = () => {
           status: editingProfileData.status,
           profile_image_url: profileImageUrl,
         })
-        .eq('auth_id', user.id);
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Error updating profile:', error);
@@ -785,7 +784,7 @@ const WorkspaceDetail = () => {
                       <ChatRoomList
                         workspaceId={workspaceId}
                         workspaceName={workspace?.name}
-                        currentUserId={user?.auth_id}
+                        currentUserId={user?.user_id}
                         onRoomSelect={handleChatRoomSelect}
                         selectedRoomId={selectedChatRoom?.id}
                         onCreateRoom={handleCreateChatRoom}
@@ -805,7 +804,7 @@ const WorkspaceDetail = () => {
                     <div className="px-2">
                       <DirectMessageList
                         workspaceId={workspaceId}
-                        currentUserId={user?.auth_id}
+                        currentUserId={user?.user_id}
                         currentUserEmail={user?.email}
                         onUserSelect={handleDirectMessageSelect}
                         selectedUserId={selectedDirectMessage?.id}
@@ -913,7 +912,6 @@ const WorkspaceDetail = () => {
                   </p>
                 </div>
                 <AnimatedThemeToggler className="h-8 w-8 p-0 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-accent transition-colors [&>svg]:h-4 [&>svg]:w-4">
-                  <Pointer />
                 </AnimatedThemeToggler>
                 <Button
                   variant="ghost"
@@ -922,7 +920,6 @@ const WorkspaceDetail = () => {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                 >
                   <Menu className="h-4 w-4" />
-                  <Pointer />
                 </Button>
               </div>
 
@@ -935,8 +932,7 @@ const WorkspaceDetail = () => {
                   >
                     <User className="h-4 w-4" />
                     <span className="text-sm">프로필 보기</span>
-                    <Pointer />
-                  </div>
+                    </div>
                   <div className="border-t" />
                   <div
                     className="px-4 py-2.5 hover:bg-destructive/10 cursor-pointer transition-colors flex items-center gap-2 text-destructive"
@@ -944,8 +940,7 @@ const WorkspaceDetail = () => {
                   >
                     <span className="text-sm">🚪</span>
                     <span className="text-sm font-medium">로그아웃</span>
-                    <Pointer />
-                  </div>
+                    </div>
                 </div>
               )}
             </div>
@@ -957,7 +952,6 @@ const WorkspaceDetail = () => {
             <header className="sticky top-0 z-10 bg-background border-b px-6 py-[22.7px] flex items-center gap-2 flex-shrink-0">
               <div className="relative">
                 <SidebarTrigger className="h-6 w-6" />
-                <Pointer />
               </div>
               <div className="h-4 border-l border-border" />
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -978,7 +972,7 @@ const WorkspaceDetail = () => {
         onOpenChange={setShowCreateMeetingDialog}
         onMeetingCreated={handleMeetingCreated}
         workspaceId={workspaceId}
-        currentUserId={user?.auth_id}
+        currentUserId={user?.user_id}
         defaultDate={selectedCalendarDate || new Date()}
       />
 

@@ -3,7 +3,6 @@ import { Theme } from '@radix-ui/themes'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/auth'
-import { Pointer } from './components/ui/pointer'
 import Auth from './components/pages/Auth'
 import AuthCallback from './components/pages/AuthCallback'
 import Home from './components/pages/Home'
@@ -44,9 +43,7 @@ function App() {
       grayColor="slate"
       radius="medium"
       scaling="100%"
-      style={{ cursor: "none" }}
     >
-      <Pointer />
       <AuthProvider>
         <BrowserRouter>
           <Routes>

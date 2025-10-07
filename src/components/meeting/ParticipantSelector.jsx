@@ -41,8 +41,8 @@ const ParticipantSelector = ({ workspaceId, currentUserId, selectedParticipants,
             const userIds = memberData.map(member => member.user_id)
             const { data: userData, error: userError } = await supabase
                 .from('users')
-                .select('auth_id, email')
-                .in('auth_id', userIds)
+                .select('user_id, email')
+                .in('user_id', userIds)
 
             if (userError) {
                 console.error('Error fetching user data:', userError)
@@ -56,7 +56,7 @@ const ParticipantSelector = ({ workspaceId, currentUserId, selectedParticipants,
 
             // Combine member and user data
             const membersWithEmails = memberData.map(member => {
-                const user = userData?.find(u => u.auth_id === member.user_id)
+                const user = userData?.find(u => u.user_id === member.user_id)
                 return {
                     ...member,
                     email: user?.email || member.user_id

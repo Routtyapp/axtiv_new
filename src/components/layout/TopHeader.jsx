@@ -108,7 +108,7 @@ const TopHeader = () => {
                       {user?.name || user?.email?.split("@")[0] || "사용자"}
                     </Text>
                     <Text size="1" className="text-gray-500 dark:text-white/60 block mt-1">
-                      {user?.email || user.auth_id}
+                      {user?.email || user.user_id}
                     </Text>
                   </div>
 

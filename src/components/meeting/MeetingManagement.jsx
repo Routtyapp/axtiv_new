@@ -65,8 +65,8 @@ const MeetingManagement = ({ workspaceId, onMeetingCreated }) => {
             if (allUserIds.length > 0) {
                 const { data: userEmailData, error: userError } = await supabase
                     .from('users')
-                    .select('auth_id, email')
-                    .in('auth_id', allUserIds)
+                    .select('user_id, email')
+                    .in('user_id', allUserIds)
 
                 if (userError) {
                     console.error('Error fetching user emails:', userError)
@@ -82,7 +82,7 @@ const MeetingManagement = ({ workspaceId, onMeetingCreated }) => {
                 ...meeting,
                 meeting_participants: meeting.meeting_participants?.map(participant => ({
                     ...participant,
-                    User: userData.find(u => u.auth_id === participant.user_id) || { email: participant.user_id }
+                    User: userData.find(u => u.user_id === participant.user_id) || { email: participant.user_id }
                 })) || []
             }))
 

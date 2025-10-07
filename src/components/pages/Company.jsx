@@ -38,7 +38,7 @@ const Company = () => {
             const { data: userData, error: userError } = await supabase
                 .from("users")
                 .select('enrolled_company, user_role')
-                .eq("auth_id", userId)
+                .eq("user_id", userId)
                 .single()
 
             if (userError) {
@@ -141,7 +141,7 @@ const Company = () => {
                     enrolled_company: companyData.id,
                     user_role: "owner"
                 })
-                .eq("auth_id", userId)
+                .eq("user_id", userId)
 
             if (userUpdateError) {
                 console.error("Error updating user company info:", userUpdateError.message)
@@ -235,7 +235,7 @@ const Company = () => {
                     enrolled_company: companyData.id,
                     user_role: "member"
                 })
-                .eq("auth_id", userId)
+                .eq("user_id", userId)
 
             if (updateError) {
                 console.error("Error joining company:", updateError)

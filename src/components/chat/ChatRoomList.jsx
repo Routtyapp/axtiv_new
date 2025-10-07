@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Hash, Users, Clock, Plus } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { Button, Badge } from "../ui";
@@ -15,114 +15,91 @@ const ChatRoomList = ({
   const [loading, setLoading] = useState(true);
   const { canCreateRoom } = useWorkspacePermissions(workspaceId);
 
+  // 채널 레퍼런스 관리
+  const channelRef = useRef(null);
+  const isVisibleRef = useRef(true);
+
   const fetchChatRooms = useCallback(async () => {
     if (!workspaceId || !currentUserId) return;
 
     try {
-      // 워크스페이스의 모든 팀 채팅방 가져오기 (개인 채팅방 제외)
-      const { data: rooms, error: roomsError } = await supabase
+      // 한 번의 쿼리로 모든 정보 가져오기
+      const roomIds = await supabase
         .from("chat_rooms")
-        .select(
-          `
-          id,
-          name,
-          description,
-          is_default,
-          created_at,
-          updated_at
-        `
-        )
+        .select("id")
         .eq("workspace_id", workspaceId)
         .eq("is_active", true)
-        .eq("is_direct_message", false)
-        .order("is_default", { ascending: false })
-        .order("created_at", { ascending: true });
+        .eq("is_direct_message", false);
 
-      if (roomsError) {
-        console.error("Error fetching chat rooms:", roomsError);
+      if (!roomIds.data || roomIds.data.length === 0) {
+        setChatRooms([]);
         return;
       }
 
-      // 각 채팅방의 추가 정보 가져오기
-      const roomsWithInfo = await Promise.all(
-        (rooms || []).map(async (room) => {
-          // 멤버 수 가져오기
-          const { data: members, error: membersError } = await supabase
-            .from("chat_room_members")
-            .select("user_id")
-            .eq("chat_room_id", room.id);
+      const ids = roomIds.data.map(r => r.id);
 
-          if (membersError) {
-            console.error("Error fetching room members:", membersError);
-          }
+      // 병렬로 데이터 가져오기 (각 타입당 1개 쿼리만)
+      const [roomsRes, membersRes, readStatusRes] = await Promise.all([
+        supabase
+          .from("chat_rooms")
+          .select("id, name, description, is_default, created_at, updated_at")
+          .in("id", ids)
+          .order("is_default", { ascending: false })
+          .order("created_at", { ascending: true }),
 
-          // 최근 메시지 시간 가져오기
-          const { data: lastMessage, error: messageError } = await supabase
+        supabase
+          .from("chat_room_members")
+          .select("chat_room_id, user_id")
+          .in("chat_room_id", ids),
+
+        supabase
+          .from("chat_read_status")
+          .select("chat_room_id, last_read_at")
+          .in("chat_room_id", ids)
+          .eq("user_id", currentUserId)
+      ]);
+
+      if (roomsRes.error) {
+        console.error("Error fetching rooms:", roomsRes.error);
+        return;
+      }
+
+      // 읽지 않은 메시지 수 계산 (백그라운드 작업)
+      const unreadCounts = {};
+      for (const room of roomsRes.data || []) {
+        const readStatus = (readStatusRes.data || []).find(r => r.chat_room_id === room.id);
+
+        if (readStatus?.last_read_at) {
+          const { count } = await supabase
             .from("chat_messages")
-            .select("created_at")
+            .select("id", { count: "exact", head: true })
             .eq("chat_room_id", room.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
+            .gt("created_at", readStatus.last_read_at)
+            .neq("sender_id", currentUserId);
 
-          if (messageError) {
-            console.error("Error fetching last message:", messageError);
-          }
-
-          // 읽음 상태 조회
-          const { data: readStatus, error: readError } = await supabase
-            .from("chat_read_status")
-            .select("last_read_at")
+          unreadCounts[room.id] = count || 0;
+        } else {
+          const { count } = await supabase
+            .from("chat_messages")
+            .select("id", { count: "exact", head: true })
             .eq("chat_room_id", room.id)
-            .eq("user_id", currentUserId)
-            .maybeSingle();
+            .neq("sender_id", currentUserId);
 
-          if (readError && readError.code !== "PGRST116") {
-            console.error("Error fetching read status:", readError);
-          }
+          unreadCounts[room.id] = count || 0;
+        }
+      }
 
-          let unreadCount = 0;
+      // 데이터 병합 (lastActivity는 realtime으로 업데이트)
+      const roomsWithInfo = (roomsRes.data || []).map(room => {
+        const members = (membersRes.data || []).filter(m => m.chat_room_id === room.id);
 
-          // readStatus가 있고 last_read_at이 있는 경우
-          if (readStatus?.last_read_at) {
-            const { count, error: unreadError } = await supabase
-              .from("chat_messages")
-              .select("id", { count: "exact" })
-              .eq("chat_room_id", room.id)
-              .gt("created_at", readStatus.last_read_at)
-              .neq("sender_id", currentUserId);
-
-            if (unreadError) {
-              console.error("Error fetching unread messages:", unreadError);
-            } else {
-              unreadCount = count || 0;
-            }
-          } else {
-            // readStatus가 없거나 last_read_at이 없는 경우
-            // 모든 메시지를 읽지 않은 것으로 간주
-            const { count, error: allMessagesError } = await supabase
-              .from("chat_messages")
-              .select("id", { count: "exact" })
-              .eq("chat_room_id", room.id)
-              .neq("sender_id", currentUserId);
-
-            if (allMessagesError) {
-              console.error("Error fetching all messages:", allMessagesError);
-            } else {
-              unreadCount = count || 0;
-            }
-          }
-
-          return {
-            ...room,
-            memberCount: members?.length || 0,
-            lastActivity:
-              lastMessage && lastMessage.length > 0
-                ? new Date(lastMessage[0].created_at)
-                : null,
-            unreadCount: unreadCount,
-          };
-        })
-      );
+        return {
+          ...room,
+          memberCount: members.length,
+          lastActivity: null, // Realtime으로 업데이트
+          unreadCount: unreadCounts[room.id] || 0,
+        };
+      });
 
       setChatRooms(roomsWithInfo);
     } catch (error) {
@@ -177,25 +154,84 @@ const ChatRoomList = ({
     fetchChatRooms();
   }, [fetchChatRooms]);
 
-  // 실시간 구독
-  useEffect(() => {
-    if (!workspaceId) return;
+  // Optimistic update 함수들
+  const incrementUnreadCount = useCallback((roomId) => {
+    setChatRooms(prev =>
+      prev.map(room =>
+        room.id === roomId
+          ? { ...room, unreadCount: (room.unreadCount || 0) + 1, lastActivity: new Date() }
+          : room
+      )
+    );
+  }, []);
 
-    const messagesSubscription = supabase
-      .channel("chat_messages_channel")
+  const resetUnreadCount = useCallback((roomId) => {
+    setChatRooms(prev =>
+      prev.map(room =>
+        room.id === roomId
+          ? { ...room, unreadCount: 0 }
+          : room
+      )
+    );
+  }, []);
+
+  // 메시지 INSERT 핸들러 - optimistic update
+  const handleMessageInsert = useCallback((payload) => {
+    const { chat_room_id, sender_id } = payload.new;
+
+    // 자신이 보낸 메시지가 아닌 경우에만 unread count 증가
+    if (sender_id !== currentUserId) {
+      incrementUnreadCount(chat_room_id);
+    }
+  }, [currentUserId, incrementUnreadCount]);
+
+  // 읽음 상태 변경 핸들러 - optimistic update
+  const handleReadStatusChange = useCallback((payload) => {
+    const { chat_room_id, user_id } = payload.new;
+
+    // 자신의 읽음 상태 변경인 경우에만 unread count 리셋
+    if (user_id === currentUserId) {
+      resetUnreadCount(chat_room_id);
+    }
+  }, [currentUserId, resetUnreadCount]);
+
+  // 채널 정리 함수
+  const cleanupChannel = useCallback(() => {
+    if (channelRef.current) {
+      console.log('🧹 ChatRoomList 채널 정리');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, []);
+
+  // 채널 구독 함수
+  const setupChannel = useCallback(() => {
+    if (!isVisibleRef.current) {
+      console.log('💤 백그라운드 탭 - 구독 생략');
+      return;
+    }
+
+    cleanupChannel();
+
+    const channelName = `workspace:${workspaceId}:activity`;
+
+    const channel = supabase
+      .channel(channelName, {
+        config: {
+          presence: { key: currentUserId },
+          private: true
+        }
+      })
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "chat_messages",
+          filter: `workspace_id=eq.${workspaceId}`
         },
-        fetchChatRooms
+        handleMessageInsert
       )
-      .subscribe();
-
-    const readStatusSubscription = supabase
-      .channel("chat_read_status_channel")
       .on(
         "postgres_changes",
         {
@@ -204,15 +240,48 @@ const ChatRoomList = ({
           table: "chat_read_status",
           filter: `user_id=eq.${currentUserId}`,
         },
-        fetchChatRooms
+        handleReadStatusChange
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`📡 ChatRoomList 채널 상태: ${status}`);
+      });
+
+    channelRef.current = channel;
+  }, [workspaceId, currentUserId, handleMessageInsert, handleReadStatusChange, cleanupChannel]);
+
+  // 실시간 구독 - workspace별 단일 채널
+  useEffect(() => {
+    if (!workspaceId || !currentUserId) return;
+
+    // Page Visibility API
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('👁️ ChatRoomList 백그라운드 전환');
+        isVisibleRef.current = false;
+        cleanupChannel();
+      } else {
+        console.log('👁️ ChatRoomList 포그라운드 복귀');
+        isVisibleRef.current = true;
+        // 랜덤 딜레이로 reconnection storm 방지
+        setTimeout(() => {
+          if (isVisibleRef.current) {
+            setupChannel();
+          }
+        }, 500 + Math.random() * 500);
+      }
+    };
+
+    // 초기 구독
+    setupChannel();
+
+    // Visibility 이벤트 등록
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      supabase.removeChannel(messagesSubscription);
-      supabase.removeChannel(readStatusSubscription);
+      cleanupChannel();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [workspaceId, currentUserId, fetchChatRooms]);
+  }, [workspaceId, currentUserId, setupChannel, cleanupChannel]);
 
   // 헬퍼 함수들
   const formatLastActivity = (date) => {

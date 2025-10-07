@@ -31,19 +31,19 @@ const Workspace = () => {
 
     // 워크스페이스 목록이 로드된 후 통계 정보 조회
     useEffect(() => {
-        if (workspaces.length > 0 && user?.auth_id) {
+        if (workspaces.length > 0 && user?.user_id) {
             fetchWorkspaceStats()
         }
-    }, [workspaces, user?.auth_id])
+    }, [workspaces, user?.user_id])
 
     const fetchUserWorkspaces = async () => {
-        if (!user?.auth_id) return
+        if (!user?.user_id) return
 
         try {
             const { data, error } = await supabase
                 .from("workspace_members")
                 .select("workspace_id")
-                .eq("user_id", user.auth_id)
+                .eq("user_id", user.user_id)
 
             if (error) {
                 console.error("Error fetching user workspaces:", error.message)
@@ -58,7 +58,7 @@ const Workspace = () => {
     }
 
     const fetchWorkspaceStats = async () => {
-        if (!user?.auth_id || workspaces.length === 0) return
+        if (!user?.user_id || workspaces.length === 0) return
 
         try {
             // 모든 워크스페이스의 멤버 정보를 조회
@@ -78,11 +78,11 @@ const Workspace = () => {
             workspaces.forEach(workspace => {
                 const members = membersData?.filter(m => m.workspace_id === workspace.id) || []
                 const memberCount = members.length
-                const currentUserMember = members.find(m => m.user_id === user.auth_id)
+                const currentUserMember = members.find(m => m.user_id === user.user_id)
 
                 // 사용자 역할 결정
                 let userRole = "멤버"
-                if (workspace.created_by === user.auth_id) {
+                if (workspace.created_by === user.user_id) {
                     userRole = "생성자"
                 } else if (currentUserMember?.role === "admin") {
                     userRole = "관리자"
@@ -150,7 +150,7 @@ const Workspace = () => {
                     name: workspaceName.trim(),
                     description: workspaceDescription.trim() || null,
                     company_id: companyId,
-                    created_by: user.auth_id
+                    created_by: user.user_id
                 })
                 .select()
                 .single()
@@ -170,7 +170,7 @@ const Workspace = () => {
                     description: "워크스페이스 기본 채팅방",
                     is_default: true,
                     is_direct_message: false,
-                    created_by: user.auth_id
+                    created_by: user.user_id
                 })
                 .select()
                 .single()
@@ -184,7 +184,7 @@ const Workspace = () => {
                     .from("chat_room_members")
                     .insert({
                         chat_room_id: chatRoomData.id,
-                        user_id: user.auth_id,
+                        user_id: user.user_id,
                         role: "admin"
                     })
 
@@ -210,7 +210,7 @@ const Workspace = () => {
     }
 
     const joinWorkspace = async (workspaceId) => {
-        if (!user?.auth_id) {
+        if (!user?.user_id) {
             alert("사용자 인증 정보를 찾을 수 없습니다.")
             return
         }
@@ -221,7 +221,7 @@ const Workspace = () => {
                 .from("workspace_members")
                 .insert({
                     workspace_id: workspaceId,
-                    user_id: user.auth_id,
+                    user_id: user.user_id,
                     role: "member"
                 })
 

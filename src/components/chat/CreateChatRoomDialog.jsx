@@ -23,6 +23,7 @@ const CreateChatRoomDialog = ({
         if (open && workspaceId) {
             fetchWorkspaceMembers()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, workspaceId])
 
     // 다이얼로그가 열릴 때마다 초기화
@@ -58,8 +59,8 @@ const CreateChatRoomDialog = ({
             const userIds = memberData.map(m => m.user_id)
             const { data: userData, error: userError } = await supabase
                 .from('users')
-                .select('auth_id, email, user_name')
-                .in('auth_id', userIds)
+                .select('user_id, email, user_name')
+                .in('user_id', userIds)
 
             if (userError) {
                 console.error('Error fetching user data:', userError)
@@ -69,7 +70,7 @@ const CreateChatRoomDialog = ({
             // 데이터 결합
             const membersWithDetails = memberData
                 .map(member => {
-                    const userDetail = userData.find(u => u.auth_id === member.user_id)
+                    const userDetail = userData.find(u => u.user_id === member.user_id)
                     if (!userDetail) return null
 
                     return {

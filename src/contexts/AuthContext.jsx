@@ -47,6 +47,16 @@ export const AuthProvider = ({ children }) => {
         const {
           data: { session },
         } = await supabase.auth.getSession();
+
+        // 🔐 초기 로딩 시에도 Realtime 토큰 설정 (Critical Fix)
+        if (session?.access_token) {
+          console.log("🔐 초기 Realtime 토큰 설정");
+          supabase.realtime.setAuth(session.access_token);
+        } else {
+          console.log("🔓 초기 로딩: 세션 없음");
+          supabase.realtime.setAuth(null);
+        }
+
         syncUserState(session);
       } catch (error) {
         console.error("Error getting session:", error);
@@ -61,7 +71,22 @@ export const AuthProvider = ({ children }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state change:", event, session?.user?.id);
+      console.log("🔄 Auth state change:", event, session?.user?.id);
+
+      // Realtime 인증 토큰 동기화
+      if (session?.access_token) {
+        console.log("🔐 Realtime 토큰 전역 동기화 (event:", event, ")");
+        supabase.realtime.setAuth(session.access_token);
+
+        // 토큰 갱신 이벤트 로그
+        if (event === 'TOKEN_REFRESHED') {
+          console.log("✅ 토큰 자동 갱신 완료 - 만료 방지");
+        }
+      } else {
+        console.log("🔓 Realtime 토큰 제거 (event:", event, ")");
+        supabase.realtime.setAuth(null);
+      }
+
       syncUserState(session);
       setLoading(false);
     });

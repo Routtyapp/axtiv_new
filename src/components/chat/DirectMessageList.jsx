@@ -28,15 +28,15 @@ const DirectMessageList = ({ workspaceId, currentUserId, currentUserEmail, onUse
             if (userIds.length > 0) {
                 const { data: users, error: usersError } = await supabase
                     .from('users')
-                    .select('auth_id, email')
-                    .in('auth_id', userIds)
+                    .select('user_id, email')
+                    .in('user_id', userIds)
 
                 if (usersError) {
                     console.error('Error fetching user details:', usersError)
                 } else {
                     // 멤버 정보와 사용자 정보 결합
                     const membersWithDetails = workspaceMembers.map(member => {
-                        const userDetail = users.find(u => u.auth_id === member.user_id)
+                        const userDetail = users.find(u => u.user_id === member.user_id)
                         return {
                             ...member,
                             email: userDetail?.email || member.user_id,

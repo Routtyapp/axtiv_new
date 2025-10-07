@@ -15,7 +15,7 @@
  * @property {string} [app_metadata.role] - 사용자 역할
  * @property {string[]} [app_metadata.permissions] - 사용자 권한
  * @property {string} created_at - 생성 시간
- * @property {string} auth_id - 호환성을 위한 별칭 (= id)
+ * @property {string} user_id - DB users 테이블 FK 컬럼명 (= id)
  */
 
 /**
@@ -60,6 +60,6 @@ export const normalizeUser = (rawUser) => {
     user_metadata: rawUser.user_metadata || {},
     app_metadata: rawUser.app_metadata || {},
     created_at: rawUser.created_at,
-    auth_id: rawUser.id // 호환성을 위한 별칭
+    user_id: rawUser.id // DB users 테이블의 FK 컬럼명
   }
 }
