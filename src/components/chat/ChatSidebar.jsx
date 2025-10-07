@@ -25,8 +25,7 @@ const ChatSidebar = ({
       email: user.email,
       user_metadata: user.user_metadata
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.user_id, user?.id, user?.email]);
+  }, [user?.user_id, user?.id, user?.email, user?.user_metadata]);
 
   const { messages, loading, error, sendMessage, realtimeStatus } =
     useRealtimeChat(workspaceId, stableUser, chatRoomId);

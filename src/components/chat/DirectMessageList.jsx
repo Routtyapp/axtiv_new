@@ -11,42 +11,35 @@ const DirectMessageList = ({ workspaceId, currentUserId, currentUserEmail, onUse
 
     const fetchWorkspaceMembers = useCallback(async () => {
         try {
-            // 워크스페이스 멤버 가져오기 (자신 제외)
-            const { data: workspaceMembers, error: membersError } = await supabase
+            // ✅ 최적화: JOIN으로 단일 쿼리로 변경
+            const { data: membersWithUsers, error } = await supabase
                 .from('workspace_members')
-                .select('user_id, is_online, last_seen')
+                .select(`
+                    user_id,
+                    is_online,
+                    last_seen,
+                    users!workspace_members_user_id_fkey (
+                        email
+                    )
+                `)
                 .eq('workspace_id', workspaceId)
                 .neq('user_id', currentUserId)
 
-            if (membersError) {
-                console.error('Error fetching workspace members:', membersError)
+            if (error) {
+                console.error('Error fetching workspace members:', error)
                 return
             }
 
-            // 사용자 이메일 정보 가져오기
-            const userIds = workspaceMembers?.map(m => m.user_id) || []
-            if (userIds.length > 0) {
-                const { data: users, error: usersError } = await supabase
-                    .from('users')
-                    .select('user_id, email')
-                    .in('user_id', userIds)
+            // 데이터 변환
+            const membersWithDetails = (membersWithUsers || []).map(member => ({
+                user_id: member.user_id,
+                is_online: member.is_online,
+                last_seen: member.last_seen,
+                email: member.users?.email || member.user_id,
+                displayName: member.users?.email?.split('@')[0] || 'Unknown User'
+            }))
 
-                if (usersError) {
-                    console.error('Error fetching user details:', usersError)
-                } else {
-                    // 멤버 정보와 사용자 정보 결합
-                    const membersWithDetails = workspaceMembers.map(member => {
-                        const userDetail = users.find(u => u.user_id === member.user_id)
-                        return {
-                            ...member,
-                            email: userDetail?.email || member.user_id,
-                            displayName: userDetail?.email?.split('@')[0] || 'Unknown User'
-                        }
-                    })
-
-                    setMembers(membersWithDetails)
-                }
-            }
+            setMembers(membersWithDetails)
         } catch (error) {
             console.error('Error fetching direct message users:', error)
         } finally {

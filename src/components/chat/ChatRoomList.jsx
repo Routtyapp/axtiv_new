@@ -64,29 +64,49 @@ const ChatRoomList = ({
         return;
       }
 
-      // 읽지 않은 메시지 수 계산 (백그라운드 작업)
+      // ✅ 최적화: 단일 쿼리로 모든 unread count 가져오기
       const unreadCounts = {};
-      for (const room of roomsRes.data || []) {
-        const readStatus = (readStatusRes.data || []).find(r => r.chat_room_id === room.id);
 
-        if (readStatus?.last_read_at) {
+      // 읽음 상태가 있는 방들과 없는 방들을 분리
+      const roomsWithRead = (readStatusRes.data || []).map(r => ({
+        roomId: r.chat_room_id,
+        lastReadAt: r.last_read_at
+      }));
+      const roomsWithoutRead = ids.filter(id => !roomsWithRead.find(r => r.roomId === id));
+
+      // 읽음 상태가 있는 방들의 unread count (단일 쿼리)
+      if (roomsWithRead.length > 0) {
+        const countsPromises = roomsWithRead.map(async ({ roomId, lastReadAt }) => {
           const { count } = await supabase
             .from("chat_messages")
             .select("id", { count: "exact", head: true })
-            .eq("chat_room_id", room.id)
-            .gt("created_at", readStatus.last_read_at)
+            .eq("chat_room_id", roomId)
+            .gt("created_at", lastReadAt)
             .neq("sender_id", currentUserId);
+          return { roomId, count: count || 0 };
+        });
 
-          unreadCounts[room.id] = count || 0;
-        } else {
+        const counts = await Promise.all(countsPromises);
+        counts.forEach(({ roomId, count }) => {
+          unreadCounts[roomId] = count;
+        });
+      }
+
+      // 읽음 상태가 없는 방들의 전체 메시지 count (단일 쿼리)
+      if (roomsWithoutRead.length > 0) {
+        const countsPromises = roomsWithoutRead.map(async (roomId) => {
           const { count } = await supabase
             .from("chat_messages")
             .select("id", { count: "exact", head: true })
-            .eq("chat_room_id", room.id)
+            .eq("chat_room_id", roomId)
             .neq("sender_id", currentUserId);
+          return { roomId, count: count || 0 };
+        });
 
-          unreadCounts[room.id] = count || 0;
-        }
+        const counts = await Promise.all(countsPromises);
+        counts.forEach(({ roomId, count }) => {
+          unreadCounts[roomId] = count;
+        });
       }
 
       // 데이터 병합 (lastActivity는 realtime으로 업데이트)
