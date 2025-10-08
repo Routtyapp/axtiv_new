@@ -30,7 +30,7 @@ const ChatSidebar = ({
     };
   }, [user?.user_id, user?.id, user?.email, user?.user_metadata]);
 
-  const { messages, loading, error, sendMessage, realtimeStatus } =
+  const { messages, loading, error, sendMessage, realtimeStatus, hasMoreMessages, loadingMore, loadMoreMessages } =
     useRealtimeChat(workspaceId, stableUser, chatRoomId);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
@@ -200,8 +200,11 @@ const ChatSidebar = ({
       <MessageList
         messages={messages}
         currentUserId={user.id}
-        streamingContent={streamingContent} // 👈 추가
-        isStreaming={isStreaming} // 👈 추가
+        streamingContent={streamingContent}
+        isStreaming={isStreaming}
+        hasMoreMessages={hasMoreMessages}
+        loadingMore={loadingMore}
+        loadMoreMessages={loadMoreMessages}
       />
 
       <MessageInput

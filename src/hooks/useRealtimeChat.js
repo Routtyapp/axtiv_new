@@ -80,6 +80,12 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [realtimeStatus, setRealtimeStatus] = useState('disconnected')
+    const [hasMoreMessages, setHasMoreMessages] = useState(false) // 과거 메시지 존재 여부
+    const [loadingMore, setLoadingMore] = useState(false) // 추가 로딩 상태
+    
+    // 페이지네이션 설정
+    const MESSAGES_PER_PAGE = 50 // 한 번에 로드할 메시지 수
+    const oldestMessageDateRef = useRef(null) // 가장 오래된 메시지 시간 추적
 
     // 채널 및 상태 관리
     const channelRef = useRef(null)
@@ -109,7 +115,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
     }, [])
 
-    // 폴링 방식으로 메시지 동기화 (Realtime 대체)
+    // 폴링 방식으로 메시지 동기화 (Realtime 대체) - 새 메시지만 체크
     useEffect(() => {
         if (!chatRoomId || realtimeStatus !== 'polling') return
 
@@ -117,31 +123,35 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         
         const pollMessages = async () => {
             try {
+                // 현재 가장 최신 메시지의 created_at 가져오기
+                const latestMessage = messages[messages.length - 1]
+                const lastCreatedAt = latestMessage?.created_at || new Date(0).toISOString()
+
+                // 마지막 메시지 이후의 새 메시지만 가져오기
                 const { data: newMessages, error } = await supabase
                     .from('chat_messages')
                     .select('*')
                     .eq('chat_room_id', chatRoomId)
+                    .gt('created_at', lastCreatedAt)
                     .order('created_at', { ascending: true })
+                    .limit(50) // 최대 50개까지만
 
                 if (error) {
                     console.error('❌ 폴링 메시지 로드 실패:', error)
                     return
                 }
 
-                setMessages(prev => {
-                    // 새 메시지만 추가 (중복 방지)
-                    const existingIds = new Set(prev.map(msg => msg.id))
-                    const newMsgs = newMessages.filter(msg => !existingIds.has(msg.id))
+                if (newMessages && newMessages.length > 0) {
+                    console.log('📨 폴링으로 새 메시지 발견:', newMessages.length, '개')
                     
-                    if (newMsgs.length > 0) {
-                        console.log('📨 폴링으로 새 메시지 발견:', newMsgs.length, '개')
-                        return [...prev, ...newMsgs].sort((a, b) => 
-                            new Date(a.created_at) - new Date(b.created_at)
-                        )
-                    }
+                    const messagesWithFiles = newMessages.map(message => ({
+                        ...message,
+                        files: [],
+                        sender_profile_image: null
+                    }))
                     
-                    return prev
-                })
+                    setMessages(prev => [...prev, ...messagesWithFiles])
+                }
             } catch (err) {
                 console.error('❌ 폴링 오류:', err)
             }
@@ -154,7 +164,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         const interval = setInterval(pollMessages, 3000)
 
         return () => clearInterval(interval)
-    }, [chatRoomId, realtimeStatus])
+    }, [chatRoomId, realtimeStatus, messages])
 
     // 메시지 전송 (의존성 최소화를 위해 useCallback 유지)
     const sendMessage = useCallback(async (content, messageType = 'user', files = []) => {
@@ -266,6 +276,71 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
     }, [chatRoomId, user?.user_id])
 
+    // 과거 메시지 추가 로드 (무한 스크롤용)
+    const loadMoreMessages = useCallback(async () => {
+        if (!chatRoomId || !hasMoreMessages || loadingMore) {
+            console.log('⚠️ 추가 로드 불가:', { chatRoomId, hasMoreMessages, loadingMore })
+            return
+        }
+
+        if (!oldestMessageDateRef.current) {
+            console.log('⚠️ 가장 오래된 메시지 시간이 없음')
+            return
+        }
+
+        try {
+            setLoadingMore(true)
+            console.log('📥 과거 메시지 로드 시작:', { oldestMessageDate: oldestMessageDateRef.current })
+
+            const supabase = supabaseRef.current || getSupabase()
+
+            // 가장 오래된 메시지보다 이전 메시지 50개 가져오기
+            const { data, error, count } = await supabase
+                .from('chat_messages')
+                .select('*', { count: 'exact' })
+                .eq('chat_room_id', chatRoomId)
+                .lt('created_at', oldestMessageDateRef.current) // 가장 오래된 메시지 시간보다 이전
+                .order('created_at', { ascending: false })
+                .limit(MESSAGES_PER_PAGE)
+
+            if (error) {
+                console.error('❌ 과거 메시지 로드 오류:', error)
+                throw error
+            }
+
+            const sortedMessages = (data || []).reverse()
+            console.log('📬 추가 로드된 메시지 수:', sortedMessages.length)
+            console.log('📊 전체 메시지 수:', count)
+
+            if (sortedMessages.length > 0) {
+                const messagesWithFiles = sortedMessages.map(message => ({
+                    ...message,
+                    files: [],
+                    sender_profile_image: null
+                }))
+
+                // 기존 메시지 앞에 추가
+                setMessages(prev => [...messagesWithFiles, ...prev])
+
+                // 가장 오래된 메시지 시간 업데이트
+                oldestMessageDateRef.current = messagesWithFiles[0].created_at
+                console.log('📌 업데이트된 가장 오래된 메시지 시간:', oldestMessageDateRef.current)
+
+                // 더 있는지 확인
+                const currentTotal = messages.length + sortedMessages.length
+                setHasMoreMessages(currentTotal < count)
+                console.log('📊 현재 로드된 메시지:', currentTotal, '/', count)
+            } else {
+                console.log('📭 더 이상 과거 메시지 없음')
+                setHasMoreMessages(false)
+            }
+        } catch (err) {
+            console.error('❌ 과거 메시지 로드 실패:', err)
+        } finally {
+            setLoadingMore(false)
+        }
+    }, [chatRoomId, hasMoreMessages, loadingMore, messages.length])
+
     // Realtime 구독 및 메시지 관리
     useEffect(() => {
         // 필수 정보 체크
@@ -282,23 +357,28 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         // 기존 메시지 로드 (useEffect 내부로 이동)
         const fetchMessages = async () => {
             try {
-                console.log('📥 메시지 로드 시작:', { chatRoomId })
+                console.log('📥 메시지 로드 시작 (최근 50개):', { chatRoomId })
 
-                const { data, error } = await supabase
+                // 최근 메시지 50개만 가져오기 (역순으로 정렬 후 제한)
+                const { data, error, count } = await supabase
                     .from('chat_messages')
-                    .select('*')
+                    .select('*', { count: 'exact' })
                     .eq('chat_room_id', chatRoomId)
-                    .order('created_at', { ascending: true })
+                    .order('created_at', { ascending: false }) // 최신순 정렬
+                    .limit(MESSAGES_PER_PAGE) // 50개만 로드
 
                 if (error) {
                     console.error('❌ Supabase 쿼리 오류:', error)
                     throw error
                 }
 
-                console.log('📬 로드된 메시지 수:', data?.length || 0)
-                console.log('📬 메시지 데이터:', data)
+                // 시간순으로 다시 정렬 (오래된 것부터)
+                const sortedMessages = (data || []).reverse()
+                
+                console.log('📬 로드된 메시지 수:', sortedMessages.length)
+                console.log('📊 전체 메시지 수:', count)
 
-                const messagesWithFiles = (data || []).map(message => ({
+                const messagesWithFiles = sortedMessages.map(message => ({
                     ...message,
                     files: [],
                     sender_profile_image: null // 프로필 이미지는 나중에 별도로 로드
@@ -307,6 +387,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 if (mountedRef.current) {
                     setMessages(messagesWithFiles)
                     console.log('✅ 메시지 상태 업데이트 완료')
+                    
+                    // 과거 메시지가 더 있는지 확인
+                    setHasMoreMessages(count > MESSAGES_PER_PAGE)
+                    
+                    // 가장 오래된 메시지 시간 저장
+                    if (messagesWithFiles.length > 0) {
+                        oldestMessageDateRef.current = messagesWithFiles[0].created_at
+                        console.log('📌 가장 오래된 메시지 시간:', oldestMessageDateRef.current)
+                        console.log('📊 hasMoreMessages:', count > MESSAGES_PER_PAGE, '(전체:', count, ')')
+                    }
                 }
             } catch (err) {
                 console.error('❌ 메시지 로드 오류:', err)
@@ -718,7 +808,11 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         error,
         sendMessage,
         markRoomAsRead,
-        realtimeStatus
+        realtimeStatus,
+        // 페이지네이션 관련
+        hasMoreMessages,
+        loadingMore,
+        loadMoreMessages
     }
 }
 
