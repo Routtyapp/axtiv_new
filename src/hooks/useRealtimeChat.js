@@ -8,7 +8,7 @@ const AI_ASSISTANT_AUTH_ID = import.meta.env.VITE_AI_ASSISTANT_AUTH_ID
 const globalChannelManager = {
     channels: new Map(),
     activeConnections: 0,
-    maxConnections: 2, // Supabase 설정과 일치
+    maxConnections: 1, // 더 보수적으로 설정 (메시지 전송과 구독을 하나의 연결로 처리)
     connectionQueue: [], // 연결 대기열
     lastConnectionAttempt: 0, // 마지막 연결 시도 시간
     connectionThrottleMs: 5000, // 연결 시도 간격 (5초)
@@ -16,8 +16,16 @@ const globalChannelManager = {
     getChannel(channelName, supabase) {
         if (this.channels.has(channelName)) {
             const channel = this.channels.get(channelName)
-            console.log('♻️ 기존 채널 재사용:', channelName)
-            return channel
+            
+            // 채널 상태 확인
+            if (channel.state === 'closed' || channel.state === 'errored') {
+                console.log('🔄 기존 채널 상태 불량, 재생성:', channelName, 'state:', channel.state)
+                this.channels.delete(channelName)
+                this.activeConnections = Math.max(0, this.activeConnections - 1)
+            } else {
+                console.log('♻️ 기존 채널 재사용:', channelName, 'state:', channel.state)
+                return channel
+            }
         }
         
         // 연결 시도 스로틀링 체크
@@ -100,6 +108,53 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             console.log('🔗 Supabase 인스턴스 캐시됨')
         }
     }, [])
+
+    // 폴링 방식으로 메시지 동기화 (Realtime 대체)
+    useEffect(() => {
+        if (!chatRoomId || realtimeStatus !== 'polling') return
+
+        const supabase = supabaseRef.current || getSupabase()
+        
+        const pollMessages = async () => {
+            try {
+                const { data: newMessages, error } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .eq('chat_room_id', chatRoomId)
+                    .order('created_at', { ascending: true })
+
+                if (error) {
+                    console.error('❌ 폴링 메시지 로드 실패:', error)
+                    return
+                }
+
+                setMessages(prev => {
+                    // 새 메시지만 추가 (중복 방지)
+                    const existingIds = new Set(prev.map(msg => msg.id))
+                    const newMsgs = newMessages.filter(msg => !existingIds.has(msg.id))
+                    
+                    if (newMsgs.length > 0) {
+                        console.log('📨 폴링으로 새 메시지 발견:', newMsgs.length, '개')
+                        return [...prev, ...newMsgs].sort((a, b) => 
+                            new Date(a.created_at) - new Date(b.created_at)
+                        )
+                    }
+                    
+                    return prev
+                })
+            } catch (err) {
+                console.error('❌ 폴링 오류:', err)
+            }
+        }
+
+        // 즉시 한 번 실행
+        pollMessages()
+
+        // 3초마다 폴링
+        const interval = setInterval(pollMessages, 3000)
+
+        return () => clearInterval(interval)
+    }, [chatRoomId, realtimeStatus])
 
     // 메시지 전송 (의존성 최소화를 위해 useCallback 유지)
     const sendMessage = useCallback(async (content, messageType = 'user', files = []) => {
@@ -391,9 +446,20 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         const initializeChannel = async () => {
             const channelName = `room:${chatRoomId}:messages`
             const connectionStatus = globalChannelManager.getConnectionStatus()
+            
+            // 기존 채널이 있고 사용자가 동일한지 확인
+            const existingChannel = globalChannelManager.channels.get(channelName)
+            if (existingChannel && channelRef.current === existingChannel) {
+                console.log('♻️ 기존 채널 유지:', channelName, '사용자 변경 없음')
+                setLoading(false)
+                setRealtimeStatus('SUBSCRIBED')
+                return
+            }
+            
             console.log('🚀 채널 초기화 시작:', channelName, {
                 connections: `${connectionStatus.active}/${connectionStatus.max}`,
-                available: connectionStatus.available
+                available: connectionStatus.available,
+                hasExistingChannel: !!existingChannel
             })
 
             try {
@@ -427,6 +493,14 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                     supabase.realtime.setAuth(session.access_token)
                 }
 
+                // 🚨 Realtime 구독 임시 비활성화 (연결 문제 해결을 위해)
+                console.log('⚠️ Realtime 구독 임시 비활성화 - 폴링 모드로 전환')
+                setRealtimeStatus('polling')
+                setLoading(false)
+                return
+                
+                // 아래 코드는 Realtime이 안정화되면 다시 활성화
+                /*
                 // 전역 채널 관리자를 통해 채널 가져오기 또는 생성
                 console.log('📡 Realtime 채널 구독 시작:', channelName)
                 channel = globalChannelManager.getChannel(channelName, supabase)
@@ -437,6 +511,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                     setLoading(false)
                     return
                 }
+                */
 
                 // 이벤트 리스너 등록 (이미 등록된 경우 중복 방지)
                 if (!channel._eventListenersAdded) {
@@ -448,6 +523,15 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                     console.log('📡 새 채널에 이벤트 리스너 등록')
                 } else {
                     console.log('♻️ 기존 채널 재사용 (이벤트 리스너 이미 등록됨)')
+                    
+                    // 기존 채널이 이미 구독 중인지 확인
+                    if (channel.state === 'joined' || channel.state === 'joining') {
+                        console.log('✅ 기존 채널 이미 구독 중:', channel.state)
+                        setLoading(false)
+                        setRealtimeStatus('SUBSCRIBED')
+                        channelRef.current = channel
+                        return
+                    }
                 }
 
                 channel.subscribe((status, err) => {
@@ -461,6 +545,10 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                             retryCount = 0
                             connectionRetryCount.current = 0 // 연결 재시도 카운터도 리셋
                             console.log('✅ Realtime 구독 성공')
+                            
+                            // 연결 상태 모니터링
+                            const connectionStatus = globalChannelManager.getConnectionStatus()
+                            console.log('📊 구독 성공 후 연결 상태:', connectionStatus)
                         }
 
                         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -622,7 +710,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceId, user?.user_id, chatRoomId]) // 의존성 최소화
+    }, [workspaceId, chatRoomId]) // user?.user_id 제거하여 불필요한 재연결 방지
 
     return {
         messages,

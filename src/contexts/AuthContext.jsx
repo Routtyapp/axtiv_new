@@ -128,14 +128,15 @@ const AuthProvider = ({ children }) => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth state change:", event, session?.user?.id);
 
-      // Realtime 인증 토큰 동기화 (모든 Auth 이벤트에서 실행)
+      // Realtime 인증 토큰 동기화 (필요한 경우에만 실행)
       if (session?.access_token) {
-        console.log("🔐 Realtime 토큰 전역 동기화 (event:", event, ")");
-        supabase.realtime.setAuth(session.access_token);
-
-        // 토큰 자동 갱신 이벤트 (1시간마다)
+        // 토큰 자동 갱신 이벤트는 기존 연결 유지
         if (event === 'TOKEN_REFRESHED') {
-          console.log("✅ 토큰 자동 갱신 완료 - 만료 방지");
+          console.log("✅ 토큰 자동 갱신 완료 - 기존 연결 유지");
+          // TOKEN_REFRESHED의 경우 setAuth 호출하지 않음 (연결 유지)
+        } else {
+          console.log("🔐 Realtime 토큰 전역 동기화 (event:", event, ")");
+          supabase.realtime.setAuth(session.access_token);
         }
       } else {
         console.log("🔓 Realtime 토큰 제거 (event:", event, ")");

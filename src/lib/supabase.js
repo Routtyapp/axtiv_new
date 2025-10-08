@@ -35,25 +35,25 @@ export const getSupabase = () => {
   },
   realtime: {
     params: {
-      eventsPerSecond: 3, // 이벤트 수를 더 제한하여 연결 부하 감소
-      heartbeatIntervalMs: 60000
+      eventsPerSecond: 1, // 이벤트 수를 최소로 제한
+      heartbeatIntervalMs: 300000 // 5분으로 증가하여 연결 부하 최소화
     },
-    // ✅ 연결 풀 최적화 및 연결 수 제한
-    timeout: 60000, // 타임아웃을 더 길게 설정
+    // ✅ 연결 풀 최적화 및 연결 수 제한 (극도로 보수적)
+    timeout: 120000, // 타임아웃을 2분으로 설정
     // ✅ 재연결 설정 - 백오프 증가로 연결 폭증 방지
     reconnectAfterMs: function(tries) {
-      // 지수 백오프: 10초, 20초, 40초, 80초, 최대 300초
-      return Math.min(10000 * Math.pow(2, tries), 300000)
+      // 지수 백오프: 30초, 60초, 120초, 240초, 최대 600초
+      return Math.min(30000 * Math.pow(2, tries), 600000)
     },
-    // ✅ 연결 수 제한 및 풀링 최적화 (더 보수적)
-    maxConnections: 2, // 최대 동시 연결 수를 2개로 제한
+    // ✅ 연결 수 제한 및 풀링 최적화 (극도로 보수적)
+    maxConnections: 1, // 최대 동시 연결 수를 1개로 제한
     connectionPool: true, // 연결 풀링 활성화
-    // ✅ 추가 연결 관리 설정
-    poolTimeout: 15000, // 연결 풀 타임아웃 15초
-    idleTimeout: 600000, // 유휴 연결 타임아웃 10분
+    // ✅ 추가 연결 관리 설정 (극도로 보수적)
+    poolTimeout: 30000, // 연결 풀 타임아웃 30초
+    idleTimeout: 1800000, // 유휴 연결 타임아웃 30분
     // ✅ 연결 품질 모니터링
     enableHeartbeat: true, // 하트비트 활성화
-    heartbeatInterval: 60000 // 하트비트 간격 60초
+    heartbeatInterval: 300000 // 하트비트 간격 5분
   },
   global: {
     headers: {

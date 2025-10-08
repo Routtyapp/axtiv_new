@@ -11,6 +11,7 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
             case 'CLOSED': return 'bg-gray-500'
             case 'retrying': return 'bg-blue-500 animate-pulse'
             case 'failed': return 'bg-red-600'
+            case 'polling': return 'bg-blue-400'
             default: return 'bg-yellow-500'
         }
     }
@@ -23,6 +24,7 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
             case 'CLOSED': return '연결 종료'
             case 'retrying': return '재연결 시도 중...'
             case 'failed': return '연결 실패 - 새로고침 필요'
+            case 'polling': return '폴링 모드 (3초 간격)'
             default: return '연결 중...'
         }
     }
