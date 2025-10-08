@@ -12,12 +12,10 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
     // 채널 및 상태 관리
     const channelRef = useRef(null)
-    const isSubscribedRef = useRef(false)
     const mountedRef = useRef(true)
-    const isVisibleRef = useRef(true) // Visibility API 상태 추적
-    const retryCountRef = useRef(0) // 재시도 횟수
-    const isInitializingRef = useRef(false) // 🆕 초기화 중 플래그
-    const MAX_RETRIES = 2 // 🆕 최대 재시도 횟수 (3→2로 감소)
+    const retryTimeoutRef = useRef(null) // 타이머 관리
+    const cleanupPromiseRef = useRef(null) // 정리 작업 Promise 추적
+    const MAX_RETRIES = 2
 
     // 컴포넌트 마운트 상태 추적
     useEffect(() => {
@@ -27,93 +25,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
     }, [])
 
-    // 기존 메시지 로드
-    const fetchMessages = useCallback(async () => {
-        if (!workspaceId || !chatRoomId) {
-            console.log('⚠️ 워크스페이스 ID 또는 채팅방 ID 없음:', { workspaceId, chatRoomId })
-            setLoading(false)
-            return
-        }
-
-        try {
-            const { data, error } = await supabase
-                .from('chat_messages')
-                .select(`
-                    *,
-                    users!chat_messages_sender_id_fkey (
-                        profile_image_url
-                    )
-                `)
-                .eq('chat_room_id', chatRoomId)
-                .order('created_at', { ascending: true })
-
-            if (error) {
-                console.error('Error fetching messages:', error)
-                setError(error.message)
-                return
-            }
-
-            // 메시지에 프로필 이미지를 변환
-            const messagesWithFiles = (data || []).map(message => ({
-                ...message,
-                files: [], // chat_files 테이블 생성 후 연결 예정
-                sender_profile_image: message.users?.profile_image_url || null
-            }))
-
-            if (mountedRef.current) {
-                setMessages(messagesWithFiles)
-            }
-        } catch (err) {
-            console.error('Error:', err)
-            if (mountedRef.current) {
-                setError(err.message)
-            }
-        } finally {
-            if (mountedRef.current) {
-                setLoading(false)
-            }
-        }
-    }, [workspaceId, chatRoomId])
-
-    // 워크스페이스 멤버 확인 및 자동 추가
-    const ensureWorkspaceMember = useCallback(async () => {
-        if (!workspaceId || !user?.user_id) return
-
-        try {
-            console.log('🔍 사용자 워크스페이스 멤버 확인:', { workspaceId, userId: user.user_id })
-
-            // 이미 멤버인지 확인
-            const { data: existingMember } = await supabase
-                .from('workspace_members')
-                .select('*')
-                .eq('workspace_id', workspaceId)
-                .eq('user_id', user.user_id)
-                .single()
-
-            if (!existingMember) {
-                console.log('➕ 새 워크스페이스 멤버 추가')
-                const { error } = await supabase
-                    .from('workspace_members')
-                    .insert({
-                        workspace_id: workspaceId,
-                        user_id: user.user_id,
-                        role: 'member'
-                    })
-
-                if (error) {
-                    console.error('❌ 워크스페이스 멤버 추가 오류:', error)
-                } else {
-                    console.log('✅ 워크스페이스 멤버 추가 성공')
-                }
-            } else {
-                console.log('✅ 기존 멤버 확인 완료')
-            }
-        } catch (err) {
-            console.error('❌ 워크스페이스 멤버 처리 오류:', err)
-        }
-    }, [workspaceId, user?.user_id])
-
-    // 메시지 전송
+    // 메시지 전송 (의존성 최소화를 위해 useCallback 유지)
     const sendMessage = useCallback(async (content, messageType = 'user', files = []) => {
         const hasContent = content && content.trim()
         const hasFiles = files && files.length > 0
@@ -144,12 +56,10 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
 
         try {
-            console.log('📤 메시지 전송 시도:', { content, workspaceId, senderId: user.user_id })
+            console.log('📤 메시지 전송 시도:', { content, workspaceId, senderId: senderInfo.sender_id })
 
             // Optimistic Update
-            if (mountedRef.current) {
-                setMessages(prev => [...prev, optimisticMessage])
-            }
+            setMessages(prev => [...prev, optimisticMessage])
 
             const messageData = {
                 workspace_id: workspaceId,
@@ -158,7 +68,8 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 sender_name: senderInfo.sender_name,
                 content: hasContent ? content.trim() : '',
                 message_type: messageType,
-                has_files: hasFiles
+                has_files: hasFiles,
+                metadata: { tempId }
             }
 
             const { data, error } = await supabase
@@ -169,30 +80,23 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             if (error) {
                 console.error('❌ 메시지 전송 오류:', error)
                 // 전송 실패 시 optimistic 메시지 제거
-                if (mountedRef.current) {
-                    setMessages(prev => prev.filter(msg => msg.id !== tempId))
-                    setError(error.message)
-                }
+                setMessages(prev => prev.filter(msg => msg.id !== tempId))
+                setError(`메시지 전송 실패: ${error.message}`)
             } else {
                 console.log('✅ 메시지 전송 성공:', data)
-
                 // 성공 시 optimistic 메시지를 실제 메시지로 교체
-                if (mountedRef.current) {
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === tempId ? { ...data[0], files: files, _isOptimistic: false } : msg
-                    ))
-                }
+                setMessages(prev => prev.map(msg =>
+                    msg.id === tempId ? { ...data[0], files: files, _isOptimistic: false } : msg
+                ))
             }
         } catch (err) {
             console.error('❌ 메시지 전송 에러:', err)
-            if (mountedRef.current) {
-                setMessages(prev => prev.filter(msg => msg.id !== tempId))
-                setError(err.message)
-            }
+            setMessages(prev => prev.filter(msg => msg.id !== tempId))
+            setError(`메시지 전송 에러: ${err.message}`)
         }
     }, [workspaceId, chatRoomId, user])
 
-    // 채팅방 읽음 처리
+    // 채팅방 읽음 처리 (외부에서 호출 가능하도록 useCallback 유지)
     const markRoomAsRead = useCallback(async () => {
         if (!chatRoomId || !user?.user_id) return
 
@@ -211,299 +115,370 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
             if (error) {
                 console.error('❌ 읽음 처리 오류:', error)
-            } else {
-                console.log('✅ 읽음 처리 완료')
             }
         } catch (err) {
             console.error('❌ 읽음 처리 에러:', err)
         }
     }, [chatRoomId, user?.user_id])
 
-
-    // 새 메시지 처리
-    const handleNewMessage = useCallback((payload) => {
-        console.log('📨 새 메시지 수신:', payload)
-
-        if (!mountedRef.current) return
-
-        if (payload.eventType === 'INSERT') {
-            setMessages(prev => {
-                // 이미 optimistic update로 추가된 메시지인지 확인
-                const optimisticIndex = prev.findIndex(msg =>
-                    msg._isOptimistic &&
-                    msg.sender_id === payload.new.sender_id &&
-                    msg.content === payload.new.content
-                )
-
-                if (optimisticIndex !== -1) {
-                    // optimistic 메시지를 실제 메시지로 교체
-                    console.log('🔄 Optimistic 메시지를 실제 메시지로 교체:', payload.new.id)
-                    const newMessages = [...prev]
-                    newMessages[optimisticIndex] = { ...payload.new, _isOptimistic: false }
-                    return newMessages
-                }
-
-                // 중복 방지
-                const isDuplicate = prev.some(msg => msg.id === payload.new.id)
-                if (isDuplicate) {
-                    console.log('🔄 중복 메시지 무시:', payload.new.id)
-                    return prev
-                }
-
-                // 새 메시지 추가
-                console.log('✅ 새 메시지 추가:', payload.new)
-                return [...prev, payload.new]
-            })
-        }
-    }, [])
-
-   // Realtime 구독 (의존성 최소화)
-useEffect(() => {
-    if (!workspaceId || !user?.user_id || !chatRoomId) {
-        console.log('⚠️ 필수 정보 없음:', { workspaceId, userId: user?.user_id, chatRoomId })
-        setLoading(false)
-        return
-    }
-
-    // 🆕 채널 재사용 체크
-    const channelName = `private:room:${chatRoomId}`
-    if (channelRef.current && channelRef.current.topic === channelName && isSubscribedRef.current) {
-        console.log('♻️ 기존 채널 재사용:', channelName)
-        return // 이미 동일한 채널 구독 중
-    }
-
-    // 🔥 CRITICAL: 기존 채널 완전 정리 (누수 방지)
-    if (channelRef.current) {
-        console.log('🧹 기존 채널 완전 정리 (다른 채팅방으로 전환)')
-        const oldChannel = channelRef.current
-
-        // 1. 구독 해제 플래그 즉시 설정
-        isSubscribedRef.current = false
-
-        // 2. 초기화 중 플래그 리셋 (중복 방지)
-        isInitializingRef.current = false
-
-        // 3. 채널 레퍼런스 즉시 null 설정 (중복 생성 방지)
-        channelRef.current = null
-
-        // 4. 채널 제거 (비동기)
-        supabase.removeChannel(oldChannel).then(() => {
-            console.log('✅ 기존 채널 제거 완료')
-        }).catch(err => {
-            console.error('❌ 채널 제거 실패:', err)
-        })
-    }
-
-    console.log('🚀 채팅 초기화 시작:', { workspaceId, userId: user?.user_id, chatRoomId })
-
-    // 초기 데이터 로드 및 채널 구독
-    const initializeChat = async () => {
-        if (!workspaceId || !user?.user_id || !chatRoomId) return
-
-        // 🆕 이미 초기화 중이면 중복 호출 방지
-        if (isInitializingRef.current) {
-            console.log('⚠️ 이미 초기화 중 - 중복 호출 무시')
+    // Realtime 구독 및 메시지 관리
+    useEffect(() => {
+        // 필수 정보 체크
+        if (!workspaceId || !user?.user_id || !chatRoomId) {
+            console.log('⚠️ 필수 정보 없음:', { workspaceId, userId: user?.user_id, chatRoomId })
+            setLoading(false)
             return
         }
 
-        isInitializingRef.current = true
-        setLoading(true)
-        setRealtimeStatus('connecting')
+        // 상태 관리 변수들
+        let retryCount = 0
+        let channel = null
 
-        try {
-            // 🔄 인라인 코드를 함수 호출로 대체
-            await ensureWorkspaceMember()  // 워크스페이스 멤버 확인
-            await fetchMessages()           // 메시지 로드
-            await markRoomAsRead()         // 읽음 처리
-        } catch (err) {
-            console.error('❌ 초기화 오류:', err)
-        }
+        // 기존 메시지 로드 (useEffect 내부로 이동)
+        const fetchMessages = async () => {
+            try {
+                console.log('📥 메시지 로드 시작:', { chatRoomId })
 
-        // 인증 토큰 설정 (이중 보장)
-        try {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session?.access_token) {
-                console.log('🔐 Realtime 인증 토큰 설정 (구독 직전)')
-                supabase.realtime.setAuth(session.access_token)
-            }
-        } catch (err) {
-            console.error('❌ 인증 토큰 설정 실패:', err)
-        }
+                const { data, error } = await supabase
+                    .from('chat_messages')
+                    .select('*')
+                    .eq('chat_room_id', chatRoomId)
+                    .order('created_at', { ascending: true })
 
-        // 채널 생성 및 구독
-        console.log('📡 Realtime 채널 구독 시작:', channelName)
-
-        const channel = supabase
-            .channel(channelName, {
-                config: {
-                    private: true
+                if (error) {
+                    console.error('❌ Supabase 쿼리 오류:', error)
+                    throw error
                 }
-            })
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'chat_messages',
-                filter: `chat_room_id=eq.${chatRoomId}`
-            }, handleNewMessage) // 🔄 인라인 코드를 함수 호출로 대체
-            .subscribe((status, err) => {
-                console.log('📡 Realtime 구독 상태:', status, err)
+
+                console.log('📬 로드된 메시지 수:', data?.length || 0)
+                console.log('📬 메시지 데이터:', data)
+
+                const messagesWithFiles = (data || []).map(message => ({
+                    ...message,
+                    files: [],
+                    sender_profile_image: null // 프로필 이미지는 나중에 별도로 로드
+                }))
 
                 if (mountedRef.current) {
-                    setRealtimeStatus(status)
+                    setMessages(messagesWithFiles)
+                    console.log('✅ 메시지 상태 업데이트 완료')
                 }
-
-                if (status === 'SUBSCRIBED') {
-                    isSubscribedRef.current = true
-                    retryCountRef.current = 0
-                    isInitializingRef.current = false
-                    console.log('✅ Realtime 구독 성공')
+            } catch (err) {
+                console.error('❌ 메시지 로드 오류:', err)
+                console.error('오류 상세:', {
+                    message: err.message,
+                    details: err.details,
+                    hint: err.hint,
+                    code: err.code
+                })
+                if (mountedRef.current) {
+                    setError(`메시지 로드 실패: ${err.message}`)
+                    setMessages([])  // 빈 배열로 설정하여 UI가 계속 동작하도록
                 }
+                // throw err 제거 - 초기화 프로세스가 계속 진행되도록
+            }
+        }
 
-                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    console.error('❌ Realtime 구독 실패:', status, err)
-                    isInitializingRef.current = false
+        // 워크스페이스 멤버 확인 (useEffect 내부로 이동)
+        const ensureWorkspaceMember = async () => {
+            try {
+                console.log('🔍 워크스페이스 멤버 확인:', { workspaceId, userId: user.user_id })
 
-                    // DatabaseLackOfConnections 에러 감지 - 재시도 중단
-                    const isConnectionPoolError = err?.message?.includes('DatabaseLackOfConnections') ||
-                                                 err?.message?.includes("can't accept more connections")
+                const { data: existingMember } = await supabase
+                    .from('workspace_members')
+                    .select('*')
+                    .eq('workspace_id', workspaceId)
+                    .eq('user_id', user.user_id)
+                    .single()
 
-                    if (isConnectionPoolError) {
-                        console.error('🚫 데이터베이스 연결 풀 포화 - 재시도 중단')
-                        if (mountedRef.current) {
-                            setError('서버 연결이 포화 상태입니다. 잠시 후 페이지를 새로고침해주세요.')
-                        }
-                        return
-                    }
-
-                    // 토큰 만료 감지 (401 Unauthorized)
-                    const isAuthError = err?.message?.includes('401') ||
-                                      err?.message?.includes('Unauthorized') ||
-                                      err?.message?.includes('invalid_token')
-
-                    if (isAuthError) {
-                        console.error('🔐 토큰 만료 감지, 세션 갱신 시도')
-
-                        supabase.auth.refreshSession().then(({ error: refreshError }) => {
-                            if (refreshError) {
-                                console.error('❌ 세션 갱신 실패, 재로그인 필요:', refreshError)
-                                if (mountedRef.current) {
-                                    setError('인증이 만료되었습니다. 다시 로그인해주세요.')
-                                }
-                            } else {
-                                console.log('✅ 세션 갱신 성공, 재연결 시도')
-                                if (channelRef.current) {
-                                    supabase.removeChannel(channelRef.current)
-                                    channelRef.current = null
-                                    isSubscribedRef.current = false
-                                }
-                                retryCountRef.current = 0
-                                setTimeout(() => {
-                                    if (mountedRef.current && isVisibleRef.current) {
-                                        initializeChat()
-                                    }
-                                }, 1000)
-                            }
+                if (!existingMember) {
+                    console.log('➕ 워크스페이스 멤버 추가')
+                    const { error } = await supabase
+                        .from('workspace_members')
+                        .insert({
+                            workspace_id: workspaceId,
+                            user_id: user.user_id,
+                            role: 'member'
                         })
-                        return
-                    }
 
-                    // 일반 에러의 경우 재시도
-                    if (status === 'CHANNEL_ERROR' &&
-                        retryCountRef.current < MAX_RETRIES &&
-                        mountedRef.current &&
-                        isVisibleRef.current &&
-                        !isSubscribedRef.current) {
-
-                        retryCountRef.current += 1
-                        const retryDelay = Math.min(2000 * Math.pow(2, retryCountRef.current), 15000)
-                        console.log(`🔄 재시도 ${retryCountRef.current}/${MAX_RETRIES} (${retryDelay}ms 후)`)
-
-                        setTimeout(() => {
-                            if (mountedRef.current && isVisibleRef.current && !isInitializingRef.current) {
-                                if (channelRef.current) {
-                                    supabase.removeChannel(channelRef.current)
-                                    channelRef.current = null
-                                }
-                                initializeChat()
-                            }
-                        }, retryDelay)
-                    } else if (retryCountRef.current >= MAX_RETRIES) {
-                        console.error('❌ 최대 재시도 횟수 초과, 구독 중단')
-                        if (mountedRef.current) {
-                            setError('Realtime 연결 실패 (최대 재시도 횟수 초과)')
-                        }
-                    }
+                    if (error) throw error
+                    console.log('✅ 워크스페이스 멤버 추가 성공')
+                } else {
+                    console.log('✅ 기존 멤버 확인 완료')
                 }
+            } catch (err) {
+                console.error('❌ 워크스페이스 멤버 처리 오류:', err)
+                throw err
+            }
+        }
 
-                if (err) {
-                    console.error('❌ Realtime 구독 오류:', err)
-                    if (mountedRef.current) {
-                        setError(`Realtime 연결 오류: ${err.message}`)
+        // Broadcast 메시지 핸들러 (권장 방식)
+        const handleChange = (msg) => {
+            console.debug('📨 Realtime payload:', msg.payload) // 스키마 감시
+
+            if (!mountedRef.current) return
+
+            // 방어적 파싱
+            const p = msg.payload
+            const event = p?.event ?? msg.event
+            const newRecord = p?.new ?? null
+            const oldRecord = p?.old ?? null
+
+            if (!event) {
+                console.warn('⚠️ 이벤트 타입 없음:', msg)
+                return
+            }
+
+            // INSERT 처리
+            if (event === 'INSERT' && newRecord) {
+                setMessages(prev => {
+                    // tempId로 정확한 optimistic update 매칭
+                    const optimisticIndex = prev.findIndex(msg =>
+                        msg._isOptimistic &&
+                        msg.id === newRecord.metadata?.tempId
+                    )
+
+                    if (optimisticIndex !== -1) {
+                        console.log('🔄 Optimistic 메시지를 실제 메시지로 교체:', newRecord.id)
+                        const newMessages = [...prev]
+                        newMessages[optimisticIndex] = { ...newRecord, _isOptimistic: false }
+                        return newMessages
                     }
-                }
-            })
 
-        channelRef.current = channel
-        setLoading(false)
-    }
+                    // 중복 방지
+                    const isDuplicate = prev.some(msg => msg.id === newRecord.id)
+                    if (isDuplicate) {
+                        console.log('🔄 중복 메시지 무시:', newRecord.id)
+                        return prev
+                    }
 
-    initializeChat()
+                    console.log('✅ 새 메시지 추가:', newRecord)
+                    return [...prev, newRecord]
+                })
+            }
+            // UPDATE 처리
+            else if (event === 'UPDATE' && newRecord) {
+                setMessages(prev => prev.map(msg =>
+                    msg.id === newRecord.id ? { ...newRecord } : msg
+                ))
+            }
+            // DELETE 처리
+            else if (event === 'DELETE' && oldRecord) {
+                setMessages(prev => prev.filter(msg => msg.id !== oldRecord.id))
+            }
+        }
 
-    // Page Visibility API - 백그라운드 탭 구독 관리
-    const handleVisibilityChange = () => {
-        if (document.hidden) {
-            console.log('👁️ 탭 백그라운드 전환 - 구독 일시 중단')
-            isVisibleRef.current = false
-
+        // 이전 채널 정리 함수
+        const cleanupPreviousChannel = async () => {
             if (channelRef.current) {
-                isSubscribedRef.current = false
-                supabase.removeChannel(channelRef.current)
+                console.log('🧹 기존 채널 정리 시작')
+                const oldChannel = channelRef.current
                 channelRef.current = null
-                setRealtimeStatus('disconnected')
-            }
-        } else {
-            console.log('👁️ 탭 포그라운드 복귀 - 구독 재개')
-            isVisibleRef.current = true
 
-            if (window.resubscribeTimeout) {
-                clearTimeout(window.resubscribeTimeout)
-            }
-
-            window.resubscribeTimeout = setTimeout(() => {
-                if (isVisibleRef.current && mountedRef.current && !channelRef.current && !isInitializingRef.current) {
-                    console.log('⏱️ Debounce 완료 - 재구독 시작')
-                    retryCountRef.current = 0
-                    initializeChat()
+                try {
+                    await oldChannel.unsubscribe()
+                    await supabase.removeChannel(oldChannel)
+                    console.log('✅ 기존 채널 정리 완료')
+                } catch (err) {
+                    console.error('❌ 채널 정리 실패:', err)
                 }
-                window.resubscribeTimeout = null
-            }, 3000)
-        }
-    }
+            }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Cleanup
-    return () => {
-        console.log('🔌 채팅 정리 및 연결 해제')
-        mountedRef.current = false
-        isVisibleRef.current = false
-
-        if (channelRef.current) {
-            console.log('🧹 Cleanup - 채널 제거')
-            isSubscribedRef.current = false
-            supabase.removeChannel(channelRef.current)
-            channelRef.current = null
+            // 이전 정리 작업이 있다면 기다림
+            if (cleanupPromiseRef.current) {
+                try {
+                    await cleanupPromiseRef.current
+                } catch (err) {
+                    console.error('❌ 이전 정리 작업 대기 실패:', err)
+                }
+            }
         }
 
-        if (window.resubscribeTimeout) {
-            clearTimeout(window.resubscribeTimeout)
-            window.resubscribeTimeout = null
+        // 채널 초기화 함수
+        const initializeChannel = async () => {
+            const channelName = `room:${chatRoomId}:messages`
+            console.log('🚀 채널 초기화 시작:', channelName)
+
+            try {
+                // 초기 데이터 로드
+                setLoading(true)
+                setRealtimeStatus('connecting')
+
+                // 각 단계별로 에러가 발생해도 계속 진행
+                try {
+                    await ensureWorkspaceMember()
+                } catch (err) {
+                    console.error('⚠️ 워크스페이스 멤버 확인 실패 (계속 진행):', err)
+                }
+
+                try {
+                    await fetchMessages()
+                } catch (err) {
+                    console.error('⚠️ 메시지 로드 실패 (계속 진행):', err)
+                }
+
+                try {
+                    await markRoomAsRead()
+                } catch (err) {
+                    console.error('⚠️ 읽음 상태 업데이트 실패 (계속 진행):', err)
+                }
+
+                // 인증 토큰 설정
+                const { data: { session } } = await supabase.auth.getSession()
+                if (session?.access_token) {
+                    console.log('🔐 Realtime 인증 토큰 설정')
+                    supabase.realtime.setAuth(session.access_token)
+                }
+
+                // 채널 생성 및 구독
+                console.log('📡 Realtime 채널 구독 시작:', channelName)
+
+                channel = supabase
+                    .channel(channelName, {
+                        config: {
+                            private: true
+                        }
+                    })
+                    .on('broadcast', { event: 'INSERT' }, handleChange)
+                    .on('broadcast', { event: 'UPDATE' }, handleChange)
+                    .on('broadcast', { event: 'DELETE' }, handleChange)
+                    .subscribe((status, err) => {
+                        console.log('📡 Realtime 구독 상태:', status, err)
+
+                        if (!mountedRef.current) return
+
+                        setRealtimeStatus(status)
+
+                        if (status === 'SUBSCRIBED') {
+                            retryCount = 0
+                            console.log('✅ Realtime 구독 성공')
+                        }
+
+                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                            console.error('❌ Realtime 구독 실패:', status, err)
+
+                            // 에러 타입 확인
+                            const isConnectionPoolError = err?.message?.includes('DatabaseLackOfConnections')
+                            const isAuthError = err?.message?.includes('401') ||
+                                              err?.message?.includes('Unauthorized')
+
+                            if (isConnectionPoolError) {
+                                setError('서버 연결 포화 상태. 잠시 후 재시도해주세요.')
+                                return
+                            }
+
+                            if (isAuthError) {
+                                handleAuthError()
+                                return
+                            }
+
+                            // 일반 에러 재시도
+                            if (retryCount < MAX_RETRIES && mountedRef.current) {
+                                scheduleRetry()
+                            } else {
+                                setError(`연결 실패: ${err?.message || '알 수 없는 오류'}`)
+                            }
+                        }
+
+                        if (err) {
+                            console.error('❌ Realtime 구독 오류:', err)
+                            if (!mountedRef.current) return
+                            setError(`연결 오류: ${err.message}`)
+                        }
+                    })
+
+                channelRef.current = channel
+
+            } catch (err) {
+                console.error('❌ 채널 초기화 오류:', err)
+                if (mountedRef.current) {
+                    setError(`초기화 실패: ${err.message}`)
+                }
+            } finally {
+                // 어떤 경우에도 로딩 상태를 해제
+                if (mountedRef.current) {
+                    setLoading(false)
+                    console.log('🔄 로딩 상태 해제됨')
+                }
+            }
         }
 
-        document.removeEventListener('visibilitychange', handleVisibilityChange)
-        setRealtimeStatus('disconnected')
-    }
-}, [workspaceId, user?.user_id, chatRoomId, fetchMessages, ensureWorkspaceMember, markRoomAsRead, handleNewMessage]) // 의존성 배열에 함수들 추가
+        // 인증 에러 처리
+        const handleAuthError = async () => {
+            console.log('🔐 인증 갱신 시도')
+            try {
+                const { error } = await supabase.auth.refreshSession()
+                if (!mountedRef.current) return
+
+                if (error) {
+                    setError('인증 만료. 다시 로그인해주세요.')
+                } else {
+                    console.log('✅ 인증 갱신 성공')
+                    // 채널 재초기화
+                    await cleanupPreviousChannel()
+                    await initializeChannel()
+                }
+            } catch (err) {
+                if (!mountedRef.current) return
+                console.error('❌ 인증 갱신 실패:', err)
+                setError('인증 갱신 실패. 다시 로그인해주세요.')
+            }
+        }
+
+        // 재시도 스케줄링
+        const scheduleRetry = () => {
+            retryCount++
+            const retryDelay = Math.min(2000 * Math.pow(2, retryCount), 15000)
+            console.log(`🔄 재시도 ${retryCount}/${MAX_RETRIES} (${retryDelay}ms 후)`)
+
+            // 기존 타이머 정리
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current)
+            }
+
+            retryTimeoutRef.current = setTimeout(async () => {
+                if (!mountedRef.current) return
+
+                await cleanupPreviousChannel()
+                await initializeChannel()
+            }, retryDelay)
+        }
+
+        // 초기화 시작
+        const startInitialization = async () => {
+            cleanupPromiseRef.current = cleanupPreviousChannel()
+            await cleanupPromiseRef.current
+            await initializeChannel()
+        }
+
+        startInitialization()
+
+        // Cleanup
+        return () => {
+            console.log('🔌 채팅 정리 시작')
+            mountedRef.current = false
+
+            // 타이머 정리
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current)
+                retryTimeoutRef.current = null
+            }
+
+            // 채널 정리
+            if (channelRef.current) {
+                const channel = channelRef.current
+                channelRef.current = null
+
+                channel.unsubscribe()
+                    .then(() => supabase.removeChannel(channel))
+                    .then(() => console.log('✅ 채널 정리 완료'))
+                    .catch(err => console.error('❌ 채널 정리 실패:', err))
+            }
+
+            setRealtimeStatus('disconnected')
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [workspaceId, user?.user_id, chatRoomId]) // 의존성 최소화
 
     return {
         messages,
