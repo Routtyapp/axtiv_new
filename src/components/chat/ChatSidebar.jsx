@@ -1,11 +1,14 @@
-import { useState, useMemo } from "react";
-import { Skeleton, Alert, AlertDescription } from "../ui";
+import { useState, useMemo, useEffect } from "react";
+import { Skeleton, Alert, AlertDescription, Button } from "../ui";
 import { useUser } from "../../hooks/useUser";
 import useRealtimeChat from "../../hooks/useRealtimeChat";
 import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import LeaveChatRoomDialog from "./LeaveChatRoomDialog";
+
+// 🚨 임시 기능: 자동 메시지 전송 (나중에 삭제 예정)
+import { startAutoMessage, stopAutoMessage, isAutoMessageRunning, getAutoMessageCount } from "../../utils/tempAutoMessage";
 
 const ChatSidebar = ({
   workspaceId,
@@ -34,6 +37,42 @@ const ChatSidebar = ({
   // 🎯 스트리밍 상태 추가
   const [streamingContent, setStreamingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // 🚨 임시 기능: 자동 메시지 상태 (나중에 삭제 예정)
+  const [autoMessageRunning, setAutoMessageRunning] = useState(false);
+
+  // 🚨 임시 기능: 자동 메시지 전송 핸들러 (나중에 삭제 예정)
+  const handleToggleAutoMessage = () => {
+    if (autoMessageRunning) {
+      stopAutoMessage();
+      setAutoMessageRunning(false);
+    } else {
+      startAutoMessage(sendMessage, workspaceId, chatRoomId);
+      setAutoMessageRunning(true);
+    }
+  };
+
+  // 🚨 임시 기능: 자동 메시지 상태 동기화 (나중에 삭제 예정)
+  useEffect(() => {
+    const syncAutoMessageStatus = () => {
+      setAutoMessageRunning(isAutoMessageRunning());
+    };
+
+    // 1초마다 상태 동기화
+    const interval = setInterval(syncAutoMessageStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // 🚨 임시 기능: 컴포넌트 언마운트 시 자동 메시지 정리 (나중에 삭제 예정)
+  useEffect(() => {
+    return () => {
+      if (isAutoMessageRunning()) {
+        console.log('🧹 컴포넌트 언마운트 시 자동 메시지 정리');
+        stopAutoMessage();
+      }
+    };
+  }, []);
 
   if (!isAuthenticated || !user) {
     return (
@@ -131,6 +170,32 @@ const ChatSidebar = ({
         realtimeStatus={realtimeStatus}
         onLeaveRoom={chatRoomId ? () => setShowLeaveDialog(true) : null}
       />
+
+      {/* 🚨 임시 기능: 자동 메시지 전송 버튼 (나중에 삭제 예정) */}
+      {chatRoomId && (
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/20">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-yellow-700 dark:text-yellow-300">
+              🚨 테스트 모드: 자동 메시지 전송
+            </div>
+            <div className="flex items-center gap-2">
+              {autoMessageRunning && (
+                <span className="text-xs text-green-600 dark:text-green-400">
+                  전송 중: {getAutoMessageCount()}개
+                </span>
+              )}
+              <Button
+                size="sm"
+                variant={autoMessageRunning ? "destructive" : "default"}
+                onClick={handleToggleAutoMessage}
+                className="text-xs"
+              >
+                {autoMessageRunning ? "🛑 중지" : "▶️ 시작"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <MessageList
         messages={messages}
