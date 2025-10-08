@@ -35,16 +35,25 @@ export const getSupabase = () => {
   },
   realtime: {
     params: {
-      eventsPerSecond: 10,
-      heartbeatIntervalMs: 30000 // 30초로 증가하여 연결 수 절약
+      eventsPerSecond: 3, // 이벤트 수를 더 제한하여 연결 부하 감소
+      heartbeatIntervalMs: 60000
     },
-    // ✅ 연결 풀 최적화
-    timeout: 20000,
+    // ✅ 연결 풀 최적화 및 연결 수 제한
+    timeout: 60000, // 타임아웃을 더 길게 설정
     // ✅ 재연결 설정 - 백오프 증가로 연결 폭증 방지
     reconnectAfterMs: function(tries) {
-      // 지수 백오프: 2초, 4초, 8초, 16초, 최대 60초
-      return Math.min(2000 * Math.pow(2, tries), 60000)
-    }
+      // 지수 백오프: 10초, 20초, 40초, 80초, 최대 300초
+      return Math.min(10000 * Math.pow(2, tries), 300000)
+    },
+    // ✅ 연결 수 제한 및 풀링 최적화 (더 보수적)
+    maxConnections: 2, // 최대 동시 연결 수를 2개로 제한
+    connectionPool: true, // 연결 풀링 활성화
+    // ✅ 추가 연결 관리 설정
+    poolTimeout: 15000, // 연결 풀 타임아웃 15초
+    idleTimeout: 600000, // 유휴 연결 타임아웃 10분
+    // ✅ 연결 품질 모니터링
+    enableHeartbeat: true, // 하트비트 활성화
+    heartbeatInterval: 60000 // 하트비트 간격 60초
   },
   global: {
     headers: {
@@ -56,6 +65,12 @@ export const getSupabase = () => {
   })
 
   console.log('✅ Supabase 클라이언트 생성됨 (전역 싱글톤)')
+  console.log('🔧 Realtime 설정:', {
+    eventsPerSecond: supabaseInstance.realtime.params?.eventsPerSecond,
+    heartbeatIntervalMs: supabaseInstance.realtime.params?.heartbeatIntervalMs,
+    maxConnections: supabaseInstance.realtime.maxConnections,
+    connectionPool: supabaseInstance.realtime.connectionPool
+  })
   return supabaseInstance
 }
 

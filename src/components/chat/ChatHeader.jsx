@@ -9,6 +9,8 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
             case 'CHANNEL_ERROR': return 'bg-red-500'
             case 'TIMED_OUT': return 'bg-orange-500'
             case 'CLOSED': return 'bg-gray-500'
+            case 'retrying': return 'bg-blue-500 animate-pulse'
+            case 'failed': return 'bg-red-600'
             default: return 'bg-yellow-500'
         }
     }
@@ -19,6 +21,8 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
             case 'CHANNEL_ERROR': return '연결 오류'
             case 'TIMED_OUT': return '연결 시간초과'
             case 'CLOSED': return '연결 종료'
+            case 'retrying': return '재연결 시도 중...'
+            case 'failed': return '연결 실패 - 새로고침 필요'
             default: return '연결 중...'
         }
     }

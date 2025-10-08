@@ -1,8 +1,71 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 
 // AXTI (AI Assistant) 사용자 ID (환경 변수에서 로드)
 const AI_ASSISTANT_AUTH_ID = import.meta.env.VITE_AI_ASSISTANT_AUTH_ID
+
+// 전역 채널 관리자 - 연결 수 최소화를 위한 채널 재사용
+const globalChannelManager = {
+    channels: new Map(),
+    activeConnections: 0,
+    maxConnections: 2, // Supabase 설정과 일치
+    connectionQueue: [], // 연결 대기열
+    lastConnectionAttempt: 0, // 마지막 연결 시도 시간
+    connectionThrottleMs: 5000, // 연결 시도 간격 (5초)
+    
+    getChannel(channelName, supabase) {
+        if (this.channels.has(channelName)) {
+            const channel = this.channels.get(channelName)
+            console.log('♻️ 기존 채널 재사용:', channelName)
+            return channel
+        }
+        
+        // 연결 시도 스로틀링 체크
+        const now = Date.now()
+        const timeSinceLastAttempt = now - this.lastConnectionAttempt
+        
+        if (timeSinceLastAttempt < this.connectionThrottleMs) {
+            const waitTime = this.connectionThrottleMs - timeSinceLastAttempt
+            console.warn(`⚠️ 연결 시도 제한: ${waitTime}ms 후 재시도 가능`)
+            return null
+        }
+        
+        if (this.activeConnections >= this.maxConnections) {
+            console.warn('⚠️ 최대 연결 수 도달, 연결 대기 중...')
+            return null
+        }
+        
+        // 연결 시도 시간 기록
+        this.lastConnectionAttempt = now
+        
+        const channel = supabase.channel(channelName, {
+            config: { private: true }
+        })
+        
+        this.channels.set(channelName, channel)
+        this.activeConnections++
+        console.log('🆕 새 채널 생성:', channelName, `(${this.activeConnections}/${this.maxConnections})`)
+        console.log('📊 현재 연결 상태:', this.getConnectionStatus())
+        return channel
+    },
+    
+    removeChannel(channelName, channel) {
+        if (this.channels.has(channelName)) {
+            this.channels.delete(channelName)
+            this.activeConnections = Math.max(0, this.activeConnections - 1)
+            console.log('🗑️ 채널 제거:', channelName, `(${this.activeConnections}/${this.maxConnections})`)
+            console.log('📊 현재 연결 상태:', this.getConnectionStatus())
+        }
+    },
+    
+    getConnectionStatus() {
+        return {
+            active: this.activeConnections,
+            max: this.maxConnections,
+            available: this.maxConnections - this.activeConnections
+        }
+    }
+}
 
 const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
     const [messages, setMessages] = useState([])
@@ -15,13 +78,26 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
     const mountedRef = useRef(true)
     const retryTimeoutRef = useRef(null) // 타이머 관리
     const cleanupPromiseRef = useRef(null) // 정리 작업 Promise 추적
+    const connectionRetryCount = useRef(0) // 연결 재시도 횟수
+    const supabaseRef = useRef(null) // Supabase 인스턴스 캐시
     const MAX_RETRIES = 2
+    const MAX_CONNECTION_RETRIES = 5 // 최대 연결 재시도 횟수 증가
+    const CONNECTION_RETRY_DELAY = 15000 // 연결 재시도 간격 증가 (15초)
+    const CONNECTION_BACKOFF_MULTIPLIER = 1.5 // 백오프 배수
 
     // 컴포넌트 마운트 상태 추적
     useEffect(() => {
         mountedRef.current = true
         return () => {
             mountedRef.current = false
+        }
+    }, [])
+
+    // Supabase 인스턴스 초기화 (한 번만)
+    useEffect(() => {
+        if (!supabaseRef.current) {
+            supabaseRef.current = getSupabase()
+            console.log('🔗 Supabase 인스턴스 캐시됨')
         }
     }, [])
 
@@ -56,7 +132,18 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
 
         try {
-            console.log('📤 메시지 전송 시도:', { content, workspaceId, senderId: senderInfo.sender_id })
+            // 연결 상태 모니터링
+            const connectionStatus = globalChannelManager.getConnectionStatus()
+            console.log('📤 메시지 전송 시도:', { 
+                content, 
+                workspaceId, 
+                senderId: senderInfo.sender_id,
+                connections: `${connectionStatus.active}/${connectionStatus.max}`,
+                available: connectionStatus.available
+            })
+
+            // 캐시된 Supabase 인스턴스 사용
+            const supabase = supabaseRef.current || getSupabase()
 
             // Optimistic Update
             setMessages(prev => [...prev, optimisticMessage])
@@ -102,6 +189,9 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
         try {
             console.log('✅ 채팅방 읽음 처리:', { chatRoomId, userId: user.user_id })
+
+            // 캐시된 Supabase 인스턴스 사용
+            const supabase = supabaseRef.current || getSupabase()
 
             const { error } = await supabase
                 .from('chat_read_status')
@@ -294,10 +384,17 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             }
         }
 
+        // 캐시된 Supabase 인스턴스 사용
+        const supabase = supabaseRef.current || getSupabase()
+        
         // 채널 초기화 함수
         const initializeChannel = async () => {
             const channelName = `room:${chatRoomId}:messages`
-            console.log('🚀 채널 초기화 시작:', channelName)
+            const connectionStatus = globalChannelManager.getConnectionStatus()
+            console.log('🚀 채널 초기화 시작:', channelName, {
+                connections: `${connectionStatus.active}/${connectionStatus.max}`,
+                available: connectionStatus.available
+            })
 
             try {
                 // 초기 데이터 로드
@@ -330,19 +427,30 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                     supabase.realtime.setAuth(session.access_token)
                 }
 
-                // 채널 생성 및 구독
+                // 전역 채널 관리자를 통해 채널 가져오기 또는 생성
                 console.log('📡 Realtime 채널 구독 시작:', channelName)
+                channel = globalChannelManager.getChannel(channelName, supabase)
+                
+                if (!channel) {
+                    console.warn('⚠️ 채널 생성 실패: 연결 수 한계 도달')
+                    setError('서버 연결 한계에 도달했습니다. 잠시 후 다시 시도해주세요.')
+                    setLoading(false)
+                    return
+                }
 
-                channel = supabase
-                    .channel(channelName, {
-                        config: {
-                            private: true
-                        }
-                    })
-                    .on('broadcast', { event: 'INSERT' }, handleChange)
-                    .on('broadcast', { event: 'UPDATE' }, handleChange)
-                    .on('broadcast', { event: 'DELETE' }, handleChange)
-                    .subscribe((status, err) => {
+                // 이벤트 리스너 등록 (이미 등록된 경우 중복 방지)
+                if (!channel._eventListenersAdded) {
+                    channel
+                        .on('broadcast', { event: 'INSERT' }, handleChange)
+                        .on('broadcast', { event: 'UPDATE' }, handleChange)
+                        .on('broadcast', { event: 'DELETE' }, handleChange)
+                    channel._eventListenersAdded = true
+                    console.log('📡 새 채널에 이벤트 리스너 등록')
+                } else {
+                    console.log('♻️ 기존 채널 재사용 (이벤트 리스너 이미 등록됨)')
+                }
+
+                channel.subscribe((status, err) => {
                         console.log('📡 Realtime 구독 상태:', status, err)
 
                         if (!mountedRef.current) return
@@ -351,6 +459,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
                         if (status === 'SUBSCRIBED') {
                             retryCount = 0
+                            connectionRetryCount.current = 0 // 연결 재시도 카운터도 리셋
                             console.log('✅ Realtime 구독 성공')
                         }
 
@@ -363,7 +472,27 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                                               err?.message?.includes('Unauthorized')
 
                             if (isConnectionPoolError) {
-                                setError('서버 연결 포화 상태. 잠시 후 재시도해주세요.')
+                                console.warn('⚠️ 데이터베이스 연결 포화 상태 감지')
+                                connectionRetryCount.current += 1
+                                
+                                if (connectionRetryCount.current <= MAX_CONNECTION_RETRIES && mountedRef.current) {
+                                    // 지수 백오프 적용
+                                    const retryDelay = Math.floor(CONNECTION_RETRY_DELAY * Math.pow(CONNECTION_BACKOFF_MULTIPLIER, connectionRetryCount.current - 1))
+                                    
+                                    console.log(`🔄 연결 재시도 ${connectionRetryCount.current}/${MAX_CONNECTION_RETRIES} - ${retryDelay/1000}초 후`)
+                                    setError(`서버 연결 포화 상태. ${retryDelay/1000}초 후 재시도합니다...`)
+                                    setRealtimeStatus('retrying')
+                                    
+                                    setTimeout(() => {
+                                        if (mountedRef.current) {
+                                            console.log('🔄 연결 재시도 시작')
+                                            initializeChannel()
+                                        }
+                                    }, retryDelay)
+                                } else {
+                                    setError('서버 연결 한계에 도달했습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.')
+                                    setRealtimeStatus('failed')
+                                }
                                 return
                             }
 
@@ -458,24 +587,39 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             console.log('🔌 채팅 정리 시작')
             mountedRef.current = false
 
-            // 타이머 정리
+            // 모든 타이머 정리
             if (retryTimeoutRef.current) {
                 clearTimeout(retryTimeoutRef.current)
                 retryTimeoutRef.current = null
             }
 
-            // 채널 정리
+            // 재시도 카운터 리셋
+            connectionRetryCount.current = 0
+
+            // 채널 정리 - 전역 채널 관리자 사용
             if (channelRef.current) {
                 const channel = channelRef.current
+                const channelName = `room:${chatRoomId}:messages`
                 channelRef.current = null
 
-                channel.unsubscribe()
-                    .then(() => supabase.removeChannel(channel))
-                    .then(() => console.log('✅ 채널 정리 완료'))
-                    .catch(err => console.error('❌ 채널 정리 실패:', err))
-            }
+                // 즉시 구독 해제
+                try {
+                    channel.unsubscribe()
+                } catch (err) {
+                    console.warn('⚠️ 채널 구독 해제 중 오류:', err)
+                }
 
-            setRealtimeStatus('disconnected')
+                // 전역 채널 관리자에서 채널 제거
+                globalChannelManager.removeChannel(channelName, channel)
+                
+                // 상태 정리
+                setRealtimeStatus('disconnected')
+                setError(null)
+                console.log('✅ 채널 정리 완료')
+            } else {
+                setRealtimeStatus('disconnected')
+                setError(null)
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [workspaceId, user?.user_id, chatRoomId]) // 의존성 최소화

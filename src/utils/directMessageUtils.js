@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 
 /**
  * 두 사용자 간의 1:1 채팅방을 찾거나 생성합니다
@@ -17,6 +17,8 @@ export const findOrCreateDirectChatRoom = async (
     user2Email
 ) => {
     try {
+        const supabase = getSupabase()
+        
         // 1. 기존 채팅방 찾기
         // direct_participants 배열에 두 사용자 ID가 모두 포함된 채팅방 검색
         const { data: existingRoom, error: findError } = await supabase
