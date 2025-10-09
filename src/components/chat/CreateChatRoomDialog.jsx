@@ -118,7 +118,19 @@ const CreateChatRoomDialog = ({
 
         setCreating(true)
         try {
-            // 1. 채팅방 생성
+            // 🔍 DEBUG: 인증 상태 및 user 객체 확인
+            const { data: { session } } = await supabase.auth.getSession()
+            console.log('🔍 DEBUG - Auth Session:', {
+                hasSession: !!session,
+                sessionUserId: session?.user?.id,
+                contextUserId: user.id,
+                contextUserUserId: user.user_id,
+                match: session?.user?.id === user.id,
+                accessToken: session?.access_token ? 'present' : 'missing',
+                userObject: user
+            })
+
+            // 1. 채팅방 생성 (트리거가 자동으로 생성자를 admin으로 추가함)
             const { data: roomData, error: roomError } = await supabase
                 .from('chat_rooms')
                 .insert({
@@ -134,35 +146,37 @@ const CreateChatRoomDialog = ({
 
             if (roomError) {
                 console.error('Error creating chat room:', roomError)
+                console.error('🔍 DEBUG - Insert attempted with:', {
+                    workspace_id: workspaceId,
+                    created_by: user.id,
+                    name: roomName.trim()
+                })
                 alert('채팅방 생성 중 오류가 발생했습니다.')
                 return
             }
 
-            // 2. 생성자를 admin으로 추가
-            const membersToAdd = [
-                {
-                    chat_room_id: roomData.id,
-                    user_id: user.id,
-                    role: 'admin',
-                    invited_by: user.id
-                },
-                // 선택된 멤버들을 member로 추가
-                ...selectedMembers.map(memberId => ({
+            console.log('✅ 채팅방 생성 성공:', roomData)
+
+            // 2. 선택된 멤버들을 member로 추가 (생성자는 트리거로 이미 추가됨)
+            if (selectedMembers.length > 0) {
+                const membersToAdd = selectedMembers.map(memberId => ({
                     chat_room_id: roomData.id,
                     user_id: memberId,
                     role: 'member',
                     invited_by: user.id
                 }))
-            ]
 
-            const { error: membersError } = await supabase
-                .from('chat_room_members')
-                .insert(membersToAdd)
+                const { error: membersError } = await supabase
+                    .from('chat_room_members')
+                    .insert(membersToAdd)
 
-            if (membersError) {
-                console.error('Error adding room members:', membersError)
-                alert('멤버 추가 중 오류가 발생했습니다.')
-                return
+                if (membersError) {
+                    console.error('Error adding room members:', membersError)
+                    alert('일부 멤버 추가 중 오류가 발생했습니다. 채팅방은 생성되었습니다.')
+                    // 채팅방은 생성되었으므로 계속 진행
+                } else {
+                    console.log('✅ 멤버 추가 성공:', selectedMembers.length, '명')
+                }
             }
 
             // 성공 처리

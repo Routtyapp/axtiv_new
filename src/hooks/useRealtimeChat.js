@@ -99,6 +99,18 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
     const CONNECTION_RETRY_DELAY = 15000 // 연결 재시도 간격 증가 (15초)
     const CONNECTION_BACKOFF_MULTIPLIER = 1.5 // 백오프 배수
 
+    // 파일 데이터 필드명 변환 함수 (DB 필드 → UI 필드)
+    const transformFiles = (files) => {
+        if (!files || files.length === 0) return []
+        return files.map(f => ({
+            id: f.id,
+            name: f.file_name,
+            type: f.file_type,
+            size: f.file_size,
+            url: f.storage_url
+        }))
+    }
+
     // 컴포넌트 마운트 상태 추적
     useEffect(() => {
         mountedRef.current = true
@@ -115,6 +127,17 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
     }, [])
 
+    // 🔄 채팅방 전환 시 메시지 즉시 초기화
+    useEffect(() => {
+        if (chatRoomId) {
+            console.log('🔄 채팅방 전환 감지:', chatRoomId, '- 메시지 초기화')
+            setMessages([])
+            setError(null)
+            setHasMoreMessages(false)
+            oldestMessageDateRef.current = null
+        }
+    }, [chatRoomId])
+
     // 폴링 방식으로 메시지 동기화 (Realtime 대체) - 새 메시지만 체크
     useEffect(() => {
         if (!chatRoomId || realtimeStatus !== 'polling') return
@@ -130,7 +153,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 // 마지막 메시지 이후의 새 메시지만 가져오기
                 const { data: newMessages, error } = await supabase
                     .from('chat_messages')
-                    .select('*')
+                    .select(`
+                        *,
+                        files:chat_files(
+                            id,
+                            file_name,
+                            file_type,
+                            file_size,
+                            storage_url
+                        )
+                    `)
                     .eq('chat_room_id', chatRoomId)
                     .gt('created_at', lastCreatedAt)
                     .order('created_at', { ascending: true })
@@ -143,13 +175,13 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
                 if (newMessages && newMessages.length > 0) {
                     console.log('📨 폴링으로 새 메시지 발견:', newMessages.length, '개')
-                    
+
                     const messagesWithFiles = newMessages.map(message => ({
                         ...message,
-                        files: [],
+                        files: transformFiles(message.files),
                         sender_profile_image: null
                     }))
-                    
+
                     setMessages(prev => [...prev, ...messagesWithFiles])
                 }
             } catch (err) {
@@ -227,7 +259,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             const { data, error } = await supabase
                 .from('chat_messages')
                 .insert(messageData)
-                .select()
+                .select(`
+                    *,
+                    files:chat_files(
+                        id,
+                        file_name,
+                        file_type,
+                        file_size,
+                        storage_url
+                    )
+                `)
 
             if (error) {
                 console.error('❌ 메시지 전송 오류:', error)
@@ -236,6 +277,26 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 setError(`메시지 전송 실패: ${error.message}`)
             } else {
                 console.log('✅ 메시지 전송 성공:', data)
+
+                // 파일이 있는 경우 chat_files의 message_id 업데이트
+                if (data[0] && files.length > 0) {
+                    const realMessageId = data[0].id
+                    const fileIds = files.map(f => f.id).filter(id => id)
+
+                    if (fileIds.length > 0) {
+                        const { error: updateError } = await supabase
+                            .from('chat_files')
+                            .update({ message_id: realMessageId })
+                            .in('id', fileIds)
+
+                        if (updateError) {
+                            console.error('❌ 파일 message_id 업데이트 실패:', updateError)
+                        } else {
+                            console.log('✅ 파일 message_id 업데이트 성공:', fileIds.length, '개')
+                        }
+                    }
+                }
+
                 // 성공 시 optimistic 메시지를 실제 메시지로 교체
                 setMessages(prev => prev.map(msg =>
                     msg.id === tempId ? { ...data[0], files: files, _isOptimistic: false } : msg
@@ -297,7 +358,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             // 가장 오래된 메시지보다 이전 메시지 50개 가져오기
             const { data, error, count } = await supabase
                 .from('chat_messages')
-                .select('*', { count: 'exact' })
+                .select(`
+                    *,
+                    files:chat_files(
+                        id,
+                        file_name,
+                        file_type,
+                        file_size,
+                        storage_url
+                    )
+                `, { count: 'exact' })
                 .eq('chat_room_id', chatRoomId)
                 .lt('created_at', oldestMessageDateRef.current) // 가장 오래된 메시지 시간보다 이전
                 .order('created_at', { ascending: false })
@@ -315,7 +385,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
             if (sortedMessages.length > 0) {
                 const messagesWithFiles = sortedMessages.map(message => ({
                     ...message,
-                    files: [],
+                    files: transformFiles(message.files),
                     sender_profile_image: null
                 }))
 
@@ -362,7 +432,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 // 최근 메시지 50개만 가져오기 (역순으로 정렬 후 제한)
                 const { data, error, count } = await supabase
                     .from('chat_messages')
-                    .select('*', { count: 'exact' })
+                    .select(`
+                        *,
+                        files:chat_files(
+                            id,
+                            file_name,
+                            file_type,
+                            file_size,
+                            storage_url
+                        )
+                    `, { count: 'exact' })
                     .eq('chat_room_id', chatRoomId)
                     .order('created_at', { ascending: false }) // 최신순 정렬
                     .limit(MESSAGES_PER_PAGE) // 50개만 로드
@@ -380,7 +459,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
                 const messagesWithFiles = sortedMessages.map(message => ({
                     ...message,
-                    files: [],
+                    files: transformFiles(message.files),
                     sender_profile_image: null // 프로필 이미지는 나중에 별도로 로드
                 }))
 
