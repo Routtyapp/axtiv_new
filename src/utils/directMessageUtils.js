@@ -18,7 +18,14 @@ export const findOrCreateDirectChatRoom = async (
 ) => {
     try {
         const supabase = getSupabase()
-        
+
+        // 현재 로그인한 사용자 정보 가져오기
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
+        if (authError || !currentUser) {
+            console.error('Error getting current user:', authError)
+            throw new Error('로그인이 필요합니다.')
+        }
+
         // 1. 기존 채팅방 찾기
         // direct_participants 배열에 두 사용자 ID가 모두 포함된 채팅방 검색
         const { data: existingRoom, error: findError } = await supabase
@@ -53,7 +60,7 @@ export const findOrCreateDirectChatRoom = async (
                 direct_participants: [userId1, userId2],
                 is_default: false,
                 is_active: true,
-                created_by: userId1
+                created_by: currentUser.id // ✅ 현재 로그인한 사용자로 변경
             })
             .select()
             .single()
@@ -65,29 +72,42 @@ export const findOrCreateDirectChatRoom = async (
 
         console.log('Created new direct chat room:', newRoom.id)
 
-        // 3. 두 사용자를 멤버로 추가
-        const { error: membersError } = await supabase
+        // 3. 중복 체크 후 멤버 추가
+        const { data: existingMembers } = await supabase
             .from('chat_room_members')
-            .insert([
-                {
-                    chat_room_id: newRoom.id,
-                    user_id: userId1,
-                    role: 'member',
-                    invited_by: userId1
-                },
-                {
-                    chat_room_id: newRoom.id,
-                    user_id: userId2,
-                    role: 'member',
-                    invited_by: userId1
-                }
-            ])
+            .select('user_id')
+            .eq('chat_room_id', newRoom.id)
+            .in('user_id', [userId1, userId2])
 
-        if (membersError) {
-            console.error('Error adding members to direct chat room:', membersError)
-            // 멤버 추가 실패 시 채팅방 삭제
-            await supabase.from('chat_rooms').delete().eq('id', newRoom.id)
-            throw membersError
+        // 중복되지 않은 사용자만 필터링
+        const existingUserIds = existingMembers?.map(m => m.user_id) || []
+        const membersToAdd = [
+            {
+                chat_room_id: newRoom.id,
+                user_id: userId1,
+                role: 'member',
+                invited_by: currentUser.id
+            },
+            {
+                chat_room_id: newRoom.id,
+                user_id: userId2,
+                role: 'member',
+                invited_by: currentUser.id
+            }
+        ].filter(member => !existingUserIds.includes(member.user_id))
+
+        // 추가할 멤버가 있는 경우에만 INSERT
+        if (membersToAdd.length > 0) {
+            const { error: membersError } = await supabase
+                .from('chat_room_members')
+                .insert(membersToAdd)
+
+            if (membersError) {
+                console.error('Error adding members to direct chat room:', membersError)
+                // 멤버 추가 실패 시 채팅방 삭제
+                await supabase.from('chat_rooms').delete().eq('id', newRoom.id)
+                throw membersError
+            }
         }
 
         return newRoom
