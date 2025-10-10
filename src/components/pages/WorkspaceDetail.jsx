@@ -297,7 +297,7 @@ const WorkspaceDetail = () => {
       // users 테이블에서 사용자 정보 조회
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("user_id, user_name, email, user_role, last_sign_in_at, phone, profile_image_url, department, position, bio, status")
+        .select("user_id, user_name, email, user_role, last_sign_in_at, phone, profile_image_url, department, position, bio")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -318,7 +318,6 @@ const WorkspaceDetail = () => {
           department: userData.department,
           position: userData.position,
           bio: userData.bio,
-          status: userData.status,
           workspace_role: memberData.role,
           joined_at: memberData.joined_at,
         };
@@ -343,7 +342,6 @@ const WorkspaceDetail = () => {
       department: currentUserProfile?.department || '',
       position: currentUserProfile?.position || '',
       bio: currentUserProfile?.bio || '',
-      status: currentUserProfile?.status || 'available',
     });
     setProfileImagePreview(currentUserProfile?.profile_image_url || null);
     setSelectedProfileImage(null);
@@ -442,7 +440,6 @@ const WorkspaceDetail = () => {
           department: editingProfileData.department || null,
           position: editingProfileData.position || null,
           bio: editingProfileData.bio || null,
-          status: editingProfileData.status,
           profile_image_url: profileImageUrl,
         })
         .eq('user_id', user.id);
@@ -1053,31 +1050,6 @@ const WorkspaceDetail = () => {
                         <Badge variant="default" className="text-xs bg-purple-500">
                           회사 관리자
                         </Badge>
-                      )}
-                      {isEditingProfile ? (
-                        <Select
-                          value={editingProfileData?.status || 'available'}
-                          onValueChange={(value) => setEditingProfileData({...editingProfileData, status: value})}
-                        >
-                          <SelectTrigger className="h-7 w-auto text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="available">🟢 업무 가능</SelectItem>
-                            <SelectItem value="busy">🔴 바쁨</SelectItem>
-                            <SelectItem value="away">🟡 자리비움</SelectItem>
-                            <SelectItem value="in_meeting">📅 회의중</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        currentUserProfile.status && (
-                          <Badge variant="outline" className="text-xs">
-                            {currentUserProfile.status === 'available' && '🟢 업무 가능'}
-                            {currentUserProfile.status === 'busy' && '🔴 바쁨'}
-                            {currentUserProfile.status === 'away' && '🟡 자리비움'}
-                            {currentUserProfile.status === 'in_meeting' && '📅 회의중'}
-                          </Badge>
-                        )
                       )}
                     </div>
                   </div>

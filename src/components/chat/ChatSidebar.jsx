@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
-import { Skeleton, Alert, AlertDescription, Button } from "../ui";
+import { Skeleton, Alert, AlertDescription, Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui";
 import { useUser } from "../../hooks/useUser";
 import useRealtimeChat from "../../hooks/useRealtimeChat";
 import ChatHeader from "./ChatHeader";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import LeaveChatRoomDialog from "./LeaveChatRoomDialog";
+import MemberList from "./MemberList";
+import { supabase } from "../../lib/supabase";
 
 // 🚨 임시 기능: 자동 메시지 전송 (나중에 삭제 예정)
 import { startAutoMessage, stopAutoMessage, isAutoMessageRunning, getAutoMessageCount } from "../../utils/tempAutoMessage";
@@ -41,6 +43,11 @@ const ChatSidebar = ({
   // 🚨 임시 기능: 자동 메시지 상태 (나중에 삭제 예정)
   const [autoMessageRunning, setAutoMessageRunning] = useState(false);
 
+  // 👥 멤버 목록 관련 상태
+  const [showMembersDialog, setShowMembersDialog] = useState(false);
+  const [chatMembers, setChatMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
   // 🚨 임시 기능: 자동 메시지 전송 핸들러 (나중에 삭제 예정)
   const handleToggleAutoMessage = () => {
     if (autoMessageRunning) {
@@ -73,6 +80,46 @@ const ChatSidebar = ({
       }
     };
   }, []);
+
+  // 👥 채팅방이 변경될 때마다 멤버 목록 가져오기
+  useEffect(() => {
+    const fetchChatMembers = async () => {
+      if (!chatRoomId) {
+        setChatMembers([]);
+        return;
+      }
+
+      try {
+        setLoadingMembers(true);
+
+        // RPC 함수 호출 (RLS 우회)
+        const { data, error } = await supabase
+          .rpc('get_chat_room_members', { p_chat_room_id: chatRoomId });
+
+        if (error) {
+          console.error('Error fetching chat members:', error);
+          return;
+        }
+
+        // 데이터 구조 변환
+        const formattedMembers = (data || []).map(member => ({
+          id: member.id,
+          user_id: member.user_name || member.email || member.user_id,
+          role: member.role,
+          joined_at: member.joined_at,
+          email: member.email
+        }));
+
+        setChatMembers(formattedMembers);
+      } catch (error) {
+        console.error('Error in fetchChatMembers:', error);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchChatMembers();
+  }, [chatRoomId]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -162,6 +209,11 @@ const ChatSidebar = ({
     }
   };
 
+  // 👥 멤버 다이얼로그 열기 핸들러
+  const handleShowMembers = () => {
+    setShowMembersDialog(true);
+  };
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#121212]">
       <ChatHeader
@@ -169,6 +221,8 @@ const ChatSidebar = ({
         currentRoomName={chatRoomName}
         realtimeStatus={realtimeStatus}
         onLeaveRoom={chatRoomId ? () => setShowLeaveDialog(true) : null}
+        memberCount={chatMembers.length}
+        onShowMembers={handleShowMembers}
       />
 
       {/* 🚨 임시 기능: 자동 메시지 전송 버튼 (나중에 삭제 예정) */}
@@ -229,6 +283,22 @@ const ChatSidebar = ({
           currentUserId={getId()}
         />
       )}
+
+      {/* 👥 멤버 목록 다이얼로그 */}
+      <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>채팅방 참여 인원</DialogTitle>
+          </DialogHeader>
+          {loadingMembers ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <MemberList members={chatMembers} currentUserId={user?.id} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

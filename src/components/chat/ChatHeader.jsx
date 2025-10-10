@@ -1,8 +1,8 @@
 import { Flex, Heading, Text } from '@radix-ui/themes'
-import { LogOut } from 'lucide-react'
+import { LogOut, Users } from 'lucide-react'
 import { Button, Tooltip } from '../ui'
 
-const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomName }) => {
+const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomName, memberCount, onShowMembers }) => {
     const getStatusColor = () => {
         switch (realtimeStatus) {
             case 'SUBSCRIBED': return 'bg-green-500'
@@ -30,7 +30,7 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
     }
 
     return (
-        <div className="border-b border-gray-200 p-4">
+        <div className="border-b border-gray-200 dark:border-gray-700 p-4">
             <Flex align="center" justify="between">
                 <Flex direction="column" gap="1">
                     <Flex align="center" gap="2">
@@ -41,7 +41,21 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
                             <div className={`w-2 h-2 rounded-full ${getStatusColor()}`}></div>
                         </Tooltip>
                     </Flex>
-                    <Text size="2" color="gray">{workspaceName}</Text>
+                    {/* 참여 인원 수 버튼 - 채팅방 이름 아래로 이동 */}
+                    {memberCount !== undefined && onShowMembers && (
+                        <Tooltip content="참여 인원 보기">
+                            <Button
+                                variant="ghost"
+                                color="gray"
+                                size="1"
+                                onClick={onShowMembers}
+                                className="w-fit"
+                            >
+                                <Users className="h-3 w-3" />
+                                <span className="ml-1 text-xs">{memberCount}명</span>
+                            </Button>
+                        </Tooltip>
+                    )}
                 </Flex>
                 {/* 채팅방 나가기 버튼 */}
                 {onLeaveRoom && currentRoomName && (

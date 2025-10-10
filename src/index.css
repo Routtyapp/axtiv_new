@@ -88,13 +88,13 @@
 .dark {
   /* Material Design 3 Dark Theme - Base */
   --background: #121212;
-  --foreground: rgba(255, 255, 255, 0.87);
+  --foreground: #FFFFFF;
 
   /* Elevated Surfaces (Material Design elevation) */
   --card: #1E1E1E;
-  --card-foreground: rgba(255, 255, 255, 0.87);
+  --card-foreground: #FFFFFF;
   --popover: #232323;
-  --popover-foreground: rgba(255, 255, 255, 0.87);
+  --popover-foreground: #FFFFFF;
 
   /* Primary Colors (Teal) */
   --primary: #80CBC4;
@@ -102,11 +102,11 @@
 
   /* Secondary Colors */
   --secondary: #272727;
-  --secondary-foreground: rgba(255, 255, 255, 0.87);
+  --secondary-foreground: #FFFFFF;
   --muted: #272727;
-  --muted-foreground: rgba(255, 255, 255, 0.60);
+  --muted-foreground: #FFFFFF;
   --accent: #272727;
-  --accent-foreground: rgba(255, 255, 255, 0.87);
+  --accent-foreground: #FFFFFF;
 
   /* Error */
   --destructive: #CF6679;
@@ -126,11 +126,11 @@
 
   /* Sidebar */
   --sidebar: #1E1E1E;
-  --sidebar-foreground: rgba(255, 255, 255, 0.87);
+  --sidebar-foreground: #FFFFFF;
   --sidebar-primary: #80CBC4;
   --sidebar-primary-foreground: #000000;
   --sidebar-accent: #272727;
-  --sidebar-accent-foreground: rgba(255, 255, 255, 0.87);
+  --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgba(255, 255, 255, 0.12);
   --sidebar-ring: #80CBC4;
 }

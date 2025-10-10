@@ -1,46 +1,51 @@
 import { Flex, Heading, Text } from '@radix-ui/themes'
-import { Avatar, Badge, ScrollArea } from '../ui'
+import { Avatar, Badge, ScrollArea, AvatarFallback } from '../ui'
 
 const MemberList = ({ members, currentUserId }) => {
     return (
-        <div className="border-b border-gray-200 bg-gray-50">
+        <div className="border-gray-200 dark:border-gray-700">
             <div className="p-3">
-                <Heading size="3" weight="medium" color="gray" mb="3">
-                    멤버 ({members.length})
-                </Heading>
-
                 {members.length === 0 ? (
                     <Flex align="center" justify="center" py="4">
-                        <Text size="2" color="gray">멤버가 없습니다.</Text>
+                        <Text size="2" className="text-gray-500 dark:text-white">멤버가 없습니다.</Text>
                     </Flex>
                 ) : (
-                    <ScrollArea style={{ maxHeight: '128px' }}>
+                    <ScrollArea style={{ maxHeight: '400px' }}>
                         <Flex direction="column" gap="2">
                             {members.map((member) => (
                                 <Flex
                                     key={member.id}
                                     align="center"
-                                    gap="2"
-                                    p="2"
-                                    className={member.user_id === currentUserId ? 'bg-blue-50 rounded' : ''}
+                                    gap="3"
+                                    p="3"
+                                    className={`rounded-lg border ${
+                                        member.user_id === currentUserId
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                            : 'border-gray-200 dark:border-gray-700'
+                                    }`}
                                 >
-                                    <Avatar
-                                        fallback={member.user_id?.charAt(0) || '?'}
-                                        size="1"
-                                        color="gray"
-                                    />
+                                    <Avatar>
+                                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
+                                            {member.user_id?.charAt(0)?.toUpperCase() || '?'}
+                                        </AvatarFallback>
+                                    </Avatar>
 
                                     <Flex direction="column" flexGrow="1" style={{ minWidth: 0 }}>
-                                        <Flex align="center" gap="1">
-                                            <Text size="2" weight="medium" truncate>
+                                        <Flex align="center" gap="2">
+                                            <Text size="2" weight="medium" className="truncate dark:text-white">
                                                 {member.user_id === currentUserId ? '나' : member.user_id.split('@')[0] || member.user_id}
                                             </Text>
                                             {member.role === 'admin' && (
-                                                <Badge variant="soft" color="yellow" size="1">
+                                                <Badge variant="secondary" className="text-xs">
                                                     관리자
                                                 </Badge>
                                             )}
                                         </Flex>
+                                        {member.email && (
+                                            <Text size="1" className="text-gray-500 dark:text-gray-400 truncate">
+                                                {member.email}
+                                            </Text>
+                                        )}
                                     </Flex>
                                 </Flex>
                             ))}

@@ -86,7 +86,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
         <div className="flex flex-col h-full">
             <div className="p-6 border-b flex-shrink-0">
                 <h2 className="text-2xl font-bold">📊 워크스페이스 대시보드</h2>
-                <p className="text-gray-600 mt-2">
+                <p className="text-gray-600 dark:text-white mt-2">
                     {workspace?.name}의 활동 현황을 확인하세요
                 </p>
             </div>
@@ -97,7 +97,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <Card className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">전체 멤버</p>
+                                <p className="text-sm text-gray-600 dark:text-white">전체 멤버</p>
                                 <p className="text-2xl font-bold">{teamMembers.length}</p>
                             </div>
                             <Users className="h-8 w-8 text-blue-500" />
@@ -107,7 +107,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <Card className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">최근 메시지</p>
+                                <p className="text-sm text-gray-600 dark:text-white">최근 메시지</p>
                                 <p className="text-2xl font-bold">{recentMessages.length}</p>
                             </div>
                             <MessageCircle className="h-8 w-8 text-blue-500" />
@@ -117,7 +117,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <Card className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">예정된 회의</p>
+                                <p className="text-sm text-gray-600 dark:text-white">예정된 회의</p>
                                 <p className="text-2xl font-bold">{upcomingMeetings.length}</p>
                             </div>
                             <CalendarIcon className="h-8 w-8 text-orange-500" />
@@ -132,7 +132,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                         팀 멤버 ({teamMembers.length}명)
                     </h3>
                     {teamMembers.length === 0 ? (
-                        <p className="text-gray-500 text-center py-4">팀 멤버가 없습니다.</p>
+                        <p className="text-gray-500 dark:text-white text-center py-4">팀 멤버가 없습니다.</p>
                     ) : (
                         <ScrollArea className="h-80">
                             <div className="space-y-2 pr-4">
@@ -151,7 +151,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
 
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                                             {member.user_name}
                                                         </p>
                                                         {member.workspace_role === 'admin' && (
@@ -165,7 +165,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                                             </Badge>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-gray-500 truncate">
+                                                    <p className="text-xs text-gray-500 dark:text-white truncate">
                                                         {member.email}
                                                     </p>
                                                 </div>
@@ -189,7 +189,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                             최근 채팅 메시지
                         </h3>
                         {recentMessages.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">최근 메시지가 없습니다.</p>
+                            <p className="text-gray-500 dark:text-white text-center py-4">최근 메시지가 없습니다.</p>
                         ) : (
                             <div className="space-y-3">
                                 {recentMessages.map((message) => (
@@ -201,13 +201,13 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
-                                                <p className="text-sm font-medium text-gray-700">{message.sender_name}</p>
+                                                <p className="text-sm font-medium text-gray-700 dark:text-white">{message.sender_name}</p>
                                                 <Badge variant="outline" className="text-xs">
                                                     #{message.chat_rooms?.name || '알 수 없음'}
                                                 </Badge>
                                             </div>
-                                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{message.content}</p>
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-sm text-gray-600 dark:text-white mt-1 line-clamp-2">{message.content}</p>
+                                            <p className="text-xs text-gray-500 dark:text-white mt-1">
                                                 {new Date(message.created_at).toLocaleDateString()} {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
@@ -224,7 +224,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                             예정된 회의
                         </h3>
                         {upcomingMeetings.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">예정된 회의가 없습니다.</p>
+                            <p className="text-gray-500 dark:text-white text-center py-4">예정된 회의가 없습니다.</p>
                         ) : (
                             <div className="space-y-3">
                                 {upcomingMeetings.map((meeting) => (
@@ -232,11 +232,11 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                         <CalendarIcon className="h-5 w-5 text-orange-500 mt-0.5" />
                                         <div className="flex-1">
                                             <p className="text-sm font-medium">{meeting.title}</p>
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-gray-500 dark:text-white mt-1">
                                                 {new Date(meeting.start_time).toLocaleDateString()} {new Date(meeting.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                             {meeting.location && (
-                                                <p className="text-xs text-gray-500 mt-1">📍 {meeting.location}</p>
+                                                <p className="text-xs text-gray-500 dark:text-white mt-1">📍 {meeting.location}</p>
                                             )}
                                         </div>
                                         <Badge variant="outline" className="text-xs">
@@ -254,18 +254,18 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <h3 className="text-lg font-semibold mb-4">워크스페이스 정보</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm text-gray-600">이름</p>
+                            <p className="text-sm text-gray-600 dark:text-white">이름</p>
                             <p className="font-medium">{workspace?.name}</p>
                         </div>
                         <div>
-                            <p className="text-sm text-gray-600">생성일</p>
+                            <p className="text-sm text-gray-600 dark:text-white">생성일</p>
                             <p className="font-medium">
                                 {workspace?.created_at ? new Date(workspace.created_at).toLocaleDateString() : '-'}
                             </p>
                         </div>
                         {workspace?.description && (
                             <div className="md:col-span-2">
-                                <p className="text-sm text-gray-600">설명</p>
+                                <p className="text-sm text-gray-600 dark:text-white">설명</p>
                                 <p className="font-medium">{workspace.description}</p>
                             </div>
                         )}
@@ -318,7 +318,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                 <div className="flex items-start gap-3">
                                     <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
                                     <div className="flex-1">
-                                        <p className="text-sm text-gray-600">이메일</p>
+                                        <p className="text-sm text-gray-600 dark:text-white">이메일</p>
                                         <p className="text-sm font-medium break-all">{selectedMember.email}</p>
                                     </div>
                                 </div>
@@ -326,7 +326,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                 <div className="flex items-start gap-3">
                                     <Shield className="h-5 w-5 text-gray-400 mt-0.5" />
                                     <div className="flex-1">
-                                        <p className="text-sm text-gray-600">워크스페이스 역할</p>
+                                        <p className="text-sm text-gray-600 dark:text-white">워크스페이스 역할</p>
                                         <p className="text-sm font-medium">
                                             {selectedMember.workspace_role === 'admin' ? '관리자' : '일반 멤버'}
                                         </p>
@@ -337,7 +337,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                     <div className="flex items-start gap-3">
                                         <CalendarIcon className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div className="flex-1">
-                                            <p className="text-sm text-gray-600">워크스페이스 가입일</p>
+                                            <p className="text-sm text-gray-600 dark:text-white">워크스페이스 가입일</p>
                                             <p className="text-sm font-medium">
                                                 {new Date(selectedMember.joined_at).toLocaleDateString('ko-KR', {
                                                     year: 'numeric',
@@ -353,7 +353,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
                                     <div className="flex items-start gap-3">
                                         <TrendingUp className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div className="flex-1">
-                                            <p className="text-sm text-gray-600">마지막 로그인</p>
+                                            <p className="text-sm text-gray-600 dark:text-white">마지막 로그인</p>
                                             <p className="text-sm font-medium">
                                                 {new Date(selectedMember.last_sign_in_at).toLocaleDateString('ko-KR', {
                                                     year: 'numeric',

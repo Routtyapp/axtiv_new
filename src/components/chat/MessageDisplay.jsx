@@ -31,6 +31,14 @@ export default function MessageDisplay({ message }) {
             p: (props) => (
               <p className="leading-relaxed text-sm" {...props} />
             ),
+            a: (props) => (
+              <a
+                className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+                {...props}
+              />
+            ),
           }}
         >
           {message.content}
