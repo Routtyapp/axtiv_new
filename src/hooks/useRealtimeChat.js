@@ -127,14 +127,20 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         }
     }, [])
 
+    // 최신 메시지 시간 추적용 ref
+    const lastMessageTimeRef = useRef(null)
+
     // 🔄 채팅방 전환 시 메시지 즉시 초기화
     useEffect(() => {
         if (chatRoomId) {
-            console.log('🔄 채팅방 전환 감지:', chatRoomId, '- 메시지 초기화')
+            console.log('🔄 채팅방 전환 감지:', chatRoomId, '- 완전 초기화')
             setMessages([])
             setError(null)
             setHasMoreMessages(false)
+            setLoading(true)
+            setRealtimeStatus('disconnected') // 폴링 중단을 위해 상태 초기화
             oldestMessageDateRef.current = null
+            lastMessageTimeRef.current = null
         }
     }, [chatRoomId])
 
@@ -143,12 +149,11 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         if (!chatRoomId || realtimeStatus !== 'polling') return
 
         const supabase = supabaseRef.current || getSupabase()
-        
+
         const pollMessages = async () => {
             try {
-                // 현재 가장 최신 메시지의 created_at 가져오기
-                const latestMessage = messages[messages.length - 1]
-                const lastCreatedAt = latestMessage?.created_at || new Date(0).toISOString()
+                // ref에서 최신 메시지 시간 가져오기 (messages 의존성 제거)
+                const lastCreatedAt = lastMessageTimeRef.current || new Date(0).toISOString()
 
                 // 마지막 메시지 이후의 새 메시지만 가져오기
                 const { data: newMessages, error } = await supabase
@@ -182,6 +187,9 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                         sender_profile_image: null
                     }))
 
+                    // 최신 메시지 시간 업데이트
+                    lastMessageTimeRef.current = messagesWithFiles[messagesWithFiles.length - 1].created_at
+
                     setMessages(prev => [...prev, ...messagesWithFiles])
                 }
             } catch (err) {
@@ -196,7 +204,7 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         const interval = setInterval(pollMessages, 3000)
 
         return () => clearInterval(interval)
-    }, [chatRoomId, realtimeStatus, messages])
+    }, [chatRoomId, realtimeStatus]) // messages 의존성 제거
 
     // 메시지 전송 (의존성 최소화를 위해 useCallback 유지)
     const sendMessage = useCallback(async (content, messageType = 'user', files = []) => {
@@ -466,14 +474,16 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 if (mountedRef.current) {
                     setMessages(messagesWithFiles)
                     console.log('✅ 메시지 상태 업데이트 완료')
-                    
+
                     // 과거 메시지가 더 있는지 확인
                     setHasMoreMessages(count > MESSAGES_PER_PAGE)
-                    
-                    // 가장 오래된 메시지 시간 저장
+
+                    // 가장 오래된 메시지 시간 & 최신 메시지 시간 저장
                     if (messagesWithFiles.length > 0) {
                         oldestMessageDateRef.current = messagesWithFiles[0].created_at
+                        lastMessageTimeRef.current = messagesWithFiles[messagesWithFiles.length - 1].created_at
                         console.log('📌 가장 오래된 메시지 시간:', oldestMessageDateRef.current)
+                        console.log('📌 최신 메시지 시간:', lastMessageTimeRef.current)
                         console.log('📊 hasMoreMessages:', count > MESSAGES_PER_PAGE, '(전체:', count, ')')
                     }
                 }

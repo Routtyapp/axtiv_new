@@ -16,7 +16,6 @@ import {
   TrendingUp,
   Menu,
   MoreHorizontal,
-  Keyboard,
   Phone,
   Briefcase,
   FileText,
@@ -97,7 +96,6 @@ const WorkspaceDetail = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editingProfileData, setEditingProfileData] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showKeyboardShortcutsDialog, setShowKeyboardShortcutsDialog] = useState(false);
   const dropdownRef = useRef(null);
   const [selectedProfileImage, setSelectedProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
@@ -151,7 +149,11 @@ const WorkspaceDetail = () => {
 
   // 채팅방 선택 핸들러
   const handleChatRoomSelect = (roomId, roomName, isDefault = false) => {
-    setSelectedChatRoom({ id: roomId, name: roomName, is_default: isDefault });
+    console.log('🔄 채팅방 선택:', roomId, roomName);
+    // 이전 채팅방과 다른 경우에만 상태 업데이트
+    if (selectedChatRoom?.id !== roomId) {
+      setSelectedChatRoom({ id: roomId, name: roomName, is_default: isDefault });
+    }
     setSelectedDirectMessage(null);
     setActiveMenu("team-chat");
     setShowMeetingManagement(false);
@@ -159,12 +161,16 @@ const WorkspaceDetail = () => {
 
   // 개인 메시지 선택 핸들러
   const handleDirectMessageSelect = (chatRoomId, displayName) => {
+    console.log('🔄 개인 메시지 선택:', chatRoomId, displayName);
     // DirectMessageList에서 이미 채팅방을 생성/찾아서 chatRoomId를 전달함
-    setSelectedChatRoom({
-      id: chatRoomId,
-      name: displayName,
-      is_default: false,
-    });
+    // 이전 채팅방과 다른 경우에만 상태 업데이트
+    if (selectedChatRoom?.id !== chatRoomId) {
+      setSelectedChatRoom({
+        id: chatRoomId,
+        name: displayName,
+        is_default: false,
+      });
+    }
     setSelectedDirectMessage(null);
     setActiveMenu("team-chat"); // ChatSidebar 사용
     setShowMeetingManagement(false);
@@ -548,11 +554,6 @@ const WorkspaceDetail = () => {
 
   const moreMenuItems = [
     {
-      id: "keyboard-shortcuts",
-      label: "단축키 안내",
-      icon: Keyboard,
-    },
-    {
       id: "settings",
       label: "설정",
       icon: Settings,
@@ -843,17 +844,13 @@ const WorkspaceDetail = () => {
                         <div
                           key={item.id}
                           className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                            activeMenu === item.id && !showMeetingManagement && item.id !== "keyboard-shortcuts"
+                            activeMenu === item.id && !showMeetingManagement
                               ? "bg-primary text-primary-foreground"
                               : "hover:bg-accent hover:text-accent-foreground"
                           }`}
                           onClick={() => {
-                            if (item.id === "keyboard-shortcuts") {
-                              setShowKeyboardShortcutsDialog(true);
-                            } else {
-                              setActiveMenu(item.id);
-                              setShowMeetingManagement(false);
-                            }
+                            setActiveMenu(item.id);
+                            setShowMeetingManagement(false);
                           }}
                         >
                           <item.icon className="h-4 w-4" />
@@ -1267,99 +1264,6 @@ const WorkspaceDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* 단축키 안내 Dialog */}
-      <Dialog
-        open={showKeyboardShortcutsDialog}
-        onOpenChange={setShowKeyboardShortcutsDialog}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Keyboard className="h-5 w-5" />
-              단축키 안내
-            </DialogTitle>
-            <DialogDescription>
-              자주 사용하는 기능을 빠르게 실행할 수 있는 단축키 목록입니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* 사이드바 섹션 */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                사이드바
-              </h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-                  <span className="text-sm">사이드바 토글</span>
-                  <div className="flex items-center gap-1">
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      Ctrl
-                    </kbd>
-                    <span className="text-xs">+</span>
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      B
-                    </kbd>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 채팅 섹션 */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                채팅
-              </h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-                  <span className="text-sm">메시지 전송</span>
-                  <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                    Enter
-                  </kbd>
-                </div>
-                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-                  <span className="text-sm">줄바꿈</span>
-                  <div className="flex items-center gap-1">
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      Shift
-                    </kbd>
-                    <span className="text-xs">+</span>
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      Enter
-                    </kbd>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-                  <span className="text-sm">채팅 최상단 이동</span>
-                  <div className="flex items-center gap-1">
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      Shift
-                    </kbd>
-                    <span className="text-xs">+</span>
-                    <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                      Tab
-                    </kbd>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/30">
-                  <span className="text-sm">채팅 최하단 이동</span>
-                  <kbd className="px-2 py-1 text-xs font-semibold bg-background border rounded">
-                    Tab
-                  </kbd>
-                </div>
-              </div>
-            </div>
-
-            {/* 참고 사항 */}
-            <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                💡 Mac 사용자는 <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">Ctrl</kbd> 대신{" "}
-                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">Cmd</kbd>를 사용하세요.
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </SidebarProvider>
   );
 };
