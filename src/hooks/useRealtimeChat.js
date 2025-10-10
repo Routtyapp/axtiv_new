@@ -153,7 +153,13 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         const pollMessages = async () => {
             try {
                 // ref에서 최신 메시지 시간 가져오기 (messages 의존성 제거)
-                const lastCreatedAt = lastMessageTimeRef.current || new Date(0).toISOString()
+                // 🔒 안전 체크: 메시지 로드 전에는 폴링 건너뛰기
+                if (!lastMessageTimeRef.current) {
+                    console.log('⏭️ 폴링 건너뛰기: 메시지 아직 로드 안 됨')
+                    return
+                }
+
+                const lastCreatedAt = lastMessageTimeRef.current
 
                 // 마지막 메시지 이후의 새 메시지만 가져오기
                 const { data: newMessages, error } = await supabase
@@ -190,7 +196,19 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                     // 최신 메시지 시간 업데이트
                     lastMessageTimeRef.current = messagesWithFiles[messagesWithFiles.length - 1].created_at
 
-                    setMessages(prev => [...prev, ...messagesWithFiles])
+                    // 🔒 중복 방지: 이미 존재하는 메시지는 제외
+                    setMessages(prev => {
+                        const existingIds = new Set(prev.map(msg => msg.id))
+                        const newUniqueMessages = messagesWithFiles.filter(msg => !existingIds.has(msg.id))
+
+                        if (newUniqueMessages.length > 0) {
+                            console.log('✅ 새로운 메시지 추가:', newUniqueMessages.length, '개')
+                            return [...prev, ...newUniqueMessages]
+                        }
+
+                        console.log('⏭️ 모두 중복 메시지, 건너뛰기')
+                        return prev
+                    })
                 }
             } catch (err) {
                 console.error('❌ 폴링 오류:', err)
@@ -485,6 +503,11 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                         console.log('📌 가장 오래된 메시지 시간:', oldestMessageDateRef.current)
                         console.log('📌 최신 메시지 시간:', lastMessageTimeRef.current)
                         console.log('📊 hasMoreMessages:', count > MESSAGES_PER_PAGE, '(전체:', count, ')')
+                    } else {
+                        // 메시지가 0개인 경우: 현재 시간으로 설정하여 폴링 활성화
+                        const now = new Date().toISOString()
+                        lastMessageTimeRef.current = now
+                        console.log('📌 메시지 없음 - 폴링을 위해 현재 시간으로 초기화:', now)
                     }
                 }
             } catch (err) {
@@ -498,6 +521,11 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 if (mountedRef.current) {
                     setError(`메시지 로드 실패: ${err.message}`)
                     setMessages([])  // 빈 배열로 설정하여 UI가 계속 동작하도록
+
+                    // 🔒 에러 발생해도 폴링을 위해 현재 시간으로 초기화
+                    const now = new Date().toISOString()
+                    lastMessageTimeRef.current = now
+                    console.log('📌 에러 발생 - 폴링을 위해 현재 시간으로 초기화:', now)
                 }
                 // throw err 제거 - 초기화 프로세스가 계속 진행되도록
             }
@@ -623,6 +651,9 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
         
         // 채널 초기화 함수
         const initializeChannel = async () => {
+            // 🔒 mountedRef를 즉시 true로 설정하여 fetchMessages의 if (mountedRef.current) 체크 통과
+            mountedRef.current = true
+
             const channelName = `room:${chatRoomId}:messages`
             const connectionStatus = globalChannelManager.getConnectionStatus()
             
@@ -655,6 +686,10 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
 
                 try {
                     await fetchMessages()
+                    // 🔒 fetchMessages 완료 후 lastMessageTimeRef가 설정되었는지 확인
+                    if (!lastMessageTimeRef.current) {
+                        console.warn('⚠️ fetchMessages 완료했지만 lastMessageTimeRef가 설정 안 됨')
+                    }
                 } catch (err) {
                     console.error('⚠️ 메시지 로드 실패 (계속 진행):', err)
                 }
@@ -673,7 +708,9 @@ const useRealtimeChat = (workspaceId, user, chatRoomId = null) => {
                 }
 
                 // 🚨 Realtime 구독 임시 비활성화 (연결 문제 해결을 위해)
+                // ✅ fetchMessages 완료 후에만 폴링 모드로 전환 (안전한 실행 순서)
                 console.log('⚠️ Realtime 구독 임시 비활성화 - 폴링 모드로 전환')
+                console.log('📌 현재 lastMessageTimeRef:', lastMessageTimeRef.current ? '설정됨' : '미설정')
                 setRealtimeStatus('polling')
                 setLoading(false)
                 return

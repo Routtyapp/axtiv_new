@@ -71,7 +71,6 @@ import MeetingManagement from "../meeting/MeetingManagement";
 import { Calendar } from "../ui/calendar";
 import CreateMeetingDialog from "../meeting/CreateMeetingDialog";
 import ChatRoomList from "../chat/ChatRoomList";
-import DirectMessageList from "../chat/DirectMessageList";
 import CreateChatRoomDialog from "../chat/CreateChatRoomDialog";
 import DashboardView from "../dashboard/DashboardView";
 
@@ -82,13 +81,12 @@ const WorkspaceDetail = () => {
   const [workspace, setWorkspace] = useState(null);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeMenu, setActiveMenu] = useState("team-chat"); // 'team-chat', 'personal-chat', 'dashboard', 'settings'
+  const [activeMenu, setActiveMenu] = useState("team-chat"); // 'team-chat', 'dashboard', 'settings'
   const [showCreateMeetingDialog, setShowCreateMeetingDialog] = useState(false);
   const [meetings, setMeetings] = useState([]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
   const [showMeetingManagement, setShowMeetingManagement] = useState(false);
   const [selectedChatRoom, setSelectedChatRoom] = useState(null);
-  const [selectedDirectMessage, setSelectedDirectMessage] = useState(null);
   const [showCreateChatRoomDialog, setShowCreateChatRoomDialog] =
     useState(false);
   const [showUserProfileDialog, setShowUserProfileDialog] = useState(false);
@@ -154,25 +152,7 @@ const WorkspaceDetail = () => {
     if (selectedChatRoom?.id !== roomId) {
       setSelectedChatRoom({ id: roomId, name: roomName, is_default: isDefault });
     }
-    setSelectedDirectMessage(null);
     setActiveMenu("team-chat");
-    setShowMeetingManagement(false);
-  };
-
-  // 개인 메시지 선택 핸들러
-  const handleDirectMessageSelect = (chatRoomId, displayName) => {
-    console.log('🔄 개인 메시지 선택:', chatRoomId, displayName);
-    // DirectMessageList에서 이미 채팅방을 생성/찾아서 chatRoomId를 전달함
-    // 이전 채팅방과 다른 경우에만 상태 업데이트
-    if (selectedChatRoom?.id !== chatRoomId) {
-      setSelectedChatRoom({
-        id: chatRoomId,
-        name: displayName,
-        is_default: false,
-      });
-    }
-    setSelectedDirectMessage(null);
-    setActiveMenu("team-chat"); // ChatSidebar 사용
     setShowMeetingManagement(false);
   };
 
@@ -650,9 +630,6 @@ const WorkspaceDetail = () => {
             />
           </div>
         );
-      case "personal-chat":
-        // 개인 채팅은 이제 team-chat과 동일하게 처리됨
-        return null;
       case "dashboard":
         return (
           <DashboardView workspaceId={workspaceId} workspace={workspace} />
@@ -775,26 +752,6 @@ const WorkspaceDetail = () => {
                         onRoomSelect={handleChatRoomSelect}
                         selectedRoomId={selectedChatRoom?.id}
                         onCreateRoom={handleCreateChatRoom}
-                      />
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="personal-chat">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center">
-                      <User className="mr-3 h-4 w-4" />
-                      개인 채팅
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-2">
-                    <div className="px-2">
-                      <DirectMessageList
-                        workspaceId={workspaceId}
-                        currentUserId={user?.user_id}
-                        currentUserEmail={user?.email}
-                        onUserSelect={handleDirectMessageSelect}
-                        selectedUserId={selectedDirectMessage?.id}
                       />
                     </div>
                   </AccordionContent>
