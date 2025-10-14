@@ -9,6 +9,7 @@ import { Plus } from 'lucide-react';
 import CreateMeetingDialog from '../meeting/CreateMeetingDialog';
 import MeetingDetail from '../meeting/MeetingDetail';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+import './TeamCalendar.css';
 
 const locales = { 'ko': ko };
 
@@ -148,13 +149,8 @@ const TeamCalendar = ({ workspaceId }) => {
     return {
       style: {
         backgroundColor: event.color,
-        borderRadius: '4px',
-        opacity: 0.9,
         color: 'white',
         border: 'none',
-        display: 'block',
-        fontSize: '0.875rem',
-        padding: '2px 4px'
       }
     };
   };
@@ -213,10 +209,10 @@ const TeamCalendar = ({ workspaceId }) => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* 헤더 */}
-      <div className="p-6 border-b flex-shrink-0">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-4 border-b flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-2xl font-bold">📅 팀 캘린더</h2>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -256,14 +252,14 @@ const TeamCalendar = ({ workspaceId }) => {
       </div>
 
       {/* 캘린더 */}
-      <div className="flex-1 p-6 overflow-hidden">
-        <Card className="h-full p-4">
+      <div className="p-4">
+        <Card className="p-4">
           <Calendar
             localizer={localizer}
             events={events}
             startAccessor="start"
             endAccessor="end"
-            style={{ height: '100%' }}
+            style={{ height: '750px' }}
             eventPropGetter={eventStyleGetter}
             onSelectEvent={handleSelectEvent}
             onSelectSlot={handleSelectSlot}
