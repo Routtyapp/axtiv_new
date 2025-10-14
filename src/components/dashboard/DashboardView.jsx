@@ -59,17 +59,7 @@ const DashboardView = ({ workspaceId, workspace }) => {
         setShowProfileDialog(true)
     }
 
-    const formatLastSeen = (timestamp) => {
-        if (!timestamp) return '알 수 없음'
-        const date = new Date(timestamp)
-        const now = new Date()
-        const diffInSeconds = Math.floor((now - date) / 1000)
-
-        if (diffInSeconds < 60) return '방금 전'
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}분 전`
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`
-        return date.toLocaleDateString('ko-KR')
-    }
+ 
 
     if (loading) {
         return (
@@ -97,10 +87,13 @@ const DashboardView = ({ workspaceId, workspace }) => {
                     <Card className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600 dark:text-white">전체 멤버</p>
-                                <p className="text-2xl font-bold">{teamMembers.length}</p>
+                                <p className="text-sm text-gray-600 dark:text-white">워크스페이스 정보</p>
+                                <p className="text-xl font-bold truncate">{workspace?.name}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {workspace?.created_at ? new Date(workspace.created_at).toLocaleDateString('ko-KR') : '-'}
+                                </p>
                             </div>
-                            <Users className="h-8 w-8 text-blue-500" />
+                            <TrendingUp className="h-8 w-8 text-purple-500" />
                         </div>
                     </Card>
 
@@ -248,29 +241,6 @@ const DashboardView = ({ workspaceId, workspace }) => {
                         )}
                     </Card>
                 </div>
-
-                {/* 워크스페이스 정보 */}
-                <Card className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">워크스페이스 정보</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm text-gray-600 dark:text-white">이름</p>
-                            <p className="font-medium">{workspace?.name}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-600 dark:text-white">생성일</p>
-                            <p className="font-medium">
-                                {workspace?.created_at ? new Date(workspace.created_at).toLocaleDateString() : '-'}
-                            </p>
-                        </div>
-                        {workspace?.description && (
-                            <div className="md:col-span-2">
-                                <p className="text-sm text-gray-600 dark:text-white">설명</p>
-                                <p className="font-medium">{workspace.description}</p>
-                            </div>
-                        )}
-                    </div>
-                </Card>
             </div>
 
             {/* 프로필 상세 다이얼로그 */}

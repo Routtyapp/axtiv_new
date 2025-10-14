@@ -22,6 +22,7 @@ import {
   Pencil,
   X,
   Check,
+  FolderOpen,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
@@ -73,6 +74,7 @@ import CreateMeetingDialog from "../meeting/CreateMeetingDialog";
 import ChatRoomList from "../chat/ChatRoomList";
 import CreateChatRoomDialog from "../chat/CreateChatRoomDialog";
 import DashboardView from "../dashboard/DashboardView";
+import WorkspaceFiles from "../workspace/WorkspaceFiles";
 
 const WorkspaceDetail = () => {
   const { companyId, workspaceId } = useParams();
@@ -99,6 +101,8 @@ const WorkspaceDetail = () => {
   const [profileImagePreview, setProfileImagePreview] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef(null);
+  const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
+  const [editingWorkspaceData, setEditingWorkspaceData] = useState(null);
 
   // 회의가 있는 날짜들을 계산
   const meetingDates = useMemo(() => {
@@ -475,6 +479,53 @@ const WorkspaceDetail = () => {
     }
   };
 
+  const handleEditWorkspace = () => {
+    setIsEditingWorkspace(true);
+    setEditingWorkspaceData({
+      name: workspace?.name || '',
+      description: workspace?.description || '',
+    });
+  };
+
+  const handleCancelEditWorkspace = () => {
+    setIsEditingWorkspace(false);
+    setEditingWorkspaceData(null);
+  };
+
+  const handleSaveWorkspace = async () => {
+    if (!workspaceId || !editingWorkspaceData) return;
+
+    try {
+      const { error } = await supabase
+        .from('workspace')
+        .update({
+          name: editingWorkspaceData.name,
+          description: editingWorkspaceData.description || null,
+        })
+        .eq('id', workspaceId);
+
+      if (error) {
+        console.error('Error updating workspace:', error);
+        alert('워크스페이스 업데이트 중 오류가 발생했습니다.');
+        return;
+      }
+
+      // 워크스페이스 상태 업데이트
+      setWorkspace({
+        ...workspace,
+        name: editingWorkspaceData.name,
+        description: editingWorkspaceData.description,
+      });
+
+      setIsEditingWorkspace(false);
+      setEditingWorkspaceData(null);
+      alert('워크스페이스 정보가 성공적으로 업데이트되었습니다.');
+    } catch (error) {
+      console.error('Error saving workspace:', error);
+      alert('워크스페이스 저장 중 오류가 발생했습니다.');
+    }
+  };
+
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -631,6 +682,14 @@ const WorkspaceDetail = () => {
         return (
           <DashboardView workspaceId={workspaceId} workspace={workspace} />
         );
+      case "shared-files":
+        return (
+          <WorkspaceFiles
+            workspaceId={workspaceId}
+            workspace={workspace}
+            currentUser={user}
+          />
+        );
       case "settings":
         return (
           <div className="flex flex-col h-full">
@@ -641,32 +700,89 @@ const WorkspaceDetail = () => {
               </p>
             </div>
             <div className="flex-1 p-6 space-y-6">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  워크스페이스 정보
-                </h3>
+              <Card className="p-6 relative">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">
+                    워크스페이스 정보
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    {!isEditingWorkspace ? (
+                      <Button
+                        onClick={handleEditWorkspace}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleCancelEditWorkspace}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          onClick={handleSaveWorkspace}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       이름
                     </label>
-                    <p className="mt-1 text-sm text-gray-900">
-                      {workspace.name}
-                    </p>
+                    {isEditingWorkspace ? (
+                      <Input
+                        value={editingWorkspaceData?.name || ''}
+                        onChange={(e) => setEditingWorkspaceData({
+                          ...editingWorkspaceData,
+                          name: e.target.value
+                        })}
+                        placeholder="워크스페이스 이름을 입력하세요"
+                        className="w-full"
+                      />
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                        {workspace.name}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       설명
                     </label>
-                    <p className="mt-1 text-sm text-gray-900">
-                      {workspace.description || "설명이 없습니다."}
-                    </p>
+                    {isEditingWorkspace ? (
+                      <Textarea
+                        value={editingWorkspaceData?.description || ''}
+                        onChange={(e) => setEditingWorkspaceData({
+                          ...editingWorkspaceData,
+                          description: e.target.value
+                        })}
+                        placeholder="워크스페이스 설명을 입력하세요"
+                        className="w-full min-h-[80px] resize-none"
+                      />
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                        {workspace.description || "설명이 없습니다."}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       회사
                     </label>
-                    <p className="mt-1 text-sm text-gray-900">{company.name}</p>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{company.name}</p>
                   </div>
                 </div>
               </Card>
@@ -727,6 +843,22 @@ const WorkspaceDetail = () => {
                   >
                     <BarChart3 className="mr-3 h-4 w-4" />
                     대시보드
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => {
+                      setActiveMenu('shared-files');
+                      setShowMeetingManagement(false);
+                    }}
+                    className={`w-full justify-start ${
+                      activeMenu === 'shared-files' && !showMeetingManagement
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <FolderOpen className="mr-3 h-4 w-4" />
+                    공유 폴더
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

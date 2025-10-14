@@ -1,5 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
-import { Skeleton, Alert, AlertDescription, Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui";
+import {
+  Skeleton,
+  Alert,
+  AlertDescription,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../ui";
 import { useUser } from "../../hooks/useUser";
 import useRealtimeChat from "../../hooks/useRealtimeChat";
 import ChatHeader from "./ChatHeader";
@@ -10,7 +19,12 @@ import MemberList from "./MemberList";
 import { supabase } from "../../lib/supabase";
 
 // 🚨 임시 기능: 자동 메시지 전송 (나중에 삭제 예정)
-import { startAutoMessage, stopAutoMessage, isAutoMessageRunning, getAutoMessageCount } from "../../utils/tempAutoMessage";
+import {
+  startAutoMessage,
+  stopAutoMessage,
+  isAutoMessageRunning,
+  getAutoMessageCount,
+} from "../../utils/tempAutoMessage";
 
 const ChatSidebar = ({
   workspaceId,
@@ -28,12 +42,20 @@ const ChatSidebar = ({
     return {
       user_id: user.user_id || user.id,
       email: user.email,
-      user_metadata: user.user_metadata
+      user_metadata: user.user_metadata,
     };
   }, [user?.user_id, user?.id, user?.email, user?.user_metadata]);
 
-  const { messages, loading, error, sendMessage, realtimeStatus, hasMoreMessages, loadingMore, loadMoreMessages } =
-    useRealtimeChat(workspaceId, stableUser, chatRoomId);
+  const {
+    messages,
+    loading,
+    error,
+    sendMessage,
+    realtimeStatus,
+    hasMoreMessages,
+    loadingMore,
+    loadMoreMessages,
+  } = useRealtimeChat(workspaceId, stableUser, chatRoomId);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // 🎯 스트리밍 상태 추가
@@ -67,7 +89,7 @@ const ChatSidebar = ({
 
     // 1초마다 상태 동기화
     const interval = setInterval(syncAutoMessageStatus, 1000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -75,7 +97,7 @@ const ChatSidebar = ({
   useEffect(() => {
     return () => {
       if (isAutoMessageRunning()) {
-        console.log('🧹 컴포넌트 언마운트 시 자동 메시지 정리');
+        console.log("🧹 컴포넌트 언마운트 시 자동 메시지 정리");
         stopAutoMessage();
       }
     };
@@ -93,26 +115,27 @@ const ChatSidebar = ({
         setLoadingMembers(true);
 
         // RPC 함수 호출 (RLS 우회)
-        const { data, error } = await supabase
-          .rpc('get_chat_room_members', { p_chat_room_id: chatRoomId });
+        const { data, error } = await supabase.rpc("get_chat_room_members", {
+          p_chat_room_id: chatRoomId,
+        });
 
         if (error) {
-          console.error('Error fetching chat members:', error);
+          console.error("Error fetching chat members:", error);
           return;
         }
 
         // 데이터 구조 변환
-        const formattedMembers = (data || []).map(member => ({
+        const formattedMembers = (data || []).map((member) => ({
           id: member.id,
           user_id: member.user_name || member.email || member.user_id,
           role: member.role,
           joined_at: member.joined_at,
-          email: member.email
+          email: member.email,
         }));
 
         setChatMembers(formattedMembers);
       } catch (error) {
-        console.error('Error in fetchChatMembers:', error);
+        console.error("Error in fetchChatMembers:", error);
       } finally {
         setLoadingMembers(false);
       }
@@ -178,7 +201,12 @@ const ChatSidebar = ({
   }
 
   // 🎯 메시지 전송 핸들러 (스트리밍 상태 관리)
-  const handleSendMessage = async (content, messageType, files, isAiMode = false) => {
+  const handleSendMessage = async (
+    content,
+    messageType,
+    files,
+    isAiMode = false
+  ) => {
     // AI 모드일 때만 스트리밍 상태 관리
     if (isAiMode) {
       // 사용자 메시지일 때 스트리밍 초기화
