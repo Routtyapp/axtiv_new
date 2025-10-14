@@ -19,6 +19,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@radix-ui/themes/styles.css'  // Radix UI 디자인 시스템 스타일
+import 'react-big-calendar/lib/css/react-big-calendar.css'  // React Big Calendar 스타일
 import './index.css'  // Tailwind CSS 및 전역 스타일
 import App from './App.jsx'  // 메인 애플리케이션 컴포넌트
 

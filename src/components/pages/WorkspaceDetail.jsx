@@ -23,6 +23,7 @@ import {
   X,
   Check,
   FolderOpen,
+  CheckSquare,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
@@ -68,13 +69,12 @@ import {
   Label,
 } from "../ui";
 import ChatSidebar from "../chat/ChatSidebar";
-import MeetingManagement from "../meeting/MeetingManagement";
-import { Calendar } from "../ui/calendar";
-import CreateMeetingDialog from "../meeting/CreateMeetingDialog";
 import ChatRoomList from "../chat/ChatRoomList";
 import CreateChatRoomDialog from "../chat/CreateChatRoomDialog";
 import DashboardView from "../dashboard/DashboardView";
 import WorkspaceFiles from "../workspace/WorkspaceFiles";
+import TaskBoard from "../task/TaskBoard";
+import TeamCalendar from "../calendar/TeamCalendar";
 
 const WorkspaceDetail = () => {
   const { companyId, workspaceId } = useParams();
@@ -84,10 +84,6 @@ const WorkspaceDetail = () => {
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState("team-chat"); // 'team-chat', 'dashboard', 'settings'
-  const [showCreateMeetingDialog, setShowCreateMeetingDialog] = useState(false);
-  const [meetings, setMeetings] = useState([]);
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
-  const [showMeetingManagement, setShowMeetingManagement] = useState(false);
   const [selectedChatRoom, setSelectedChatRoom] = useState(null);
   const [showCreateChatRoomDialog, setShowCreateChatRoomDialog] =
     useState(false);
@@ -104,51 +100,6 @@ const WorkspaceDetail = () => {
   const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
   const [editingWorkspaceData, setEditingWorkspaceData] = useState(null);
 
-  // 회의가 있는 날짜들을 계산
-  const meetingDates = useMemo(() => {
-    return meetings.reduce((acc, meeting) => {
-      const meetingDate = new Date(meeting.start_time).toDateString();
-      if (!acc[meetingDate]) {
-        acc[meetingDate] = [];
-      }
-      acc[meetingDate].push(meeting);
-      return acc;
-    }, {});
-  }, [meetings]);
-
-  // 캘린더 modifiers 설정
-  const calendarModifiers = useMemo(
-    () => ({
-      hasMeetings: Object.keys(meetingDates).map(
-        (dateStr) => new Date(dateStr)
-      ),
-    }),
-    [meetingDates]
-  );
-
-  const calendarModifiersStyles = {
-    hasMeetings: {
-      backgroundColor: "rgba(59, 130, 246, 0.1)",
-      border: "1px solid rgba(59, 130, 246, 0.3)",
-      borderRadius: "4px",
-      fontWeight: "600",
-    },
-  };
-
-  // 캘린더 날짜 클릭 핸들러
-  const handleCalendarDateSelect = (date) => {
-    if (date) {
-      setSelectedCalendarDate(date);
-      setShowMeetingManagement(true);
-    }
-  };
-
-  // 회의 생성 완료 후 회의 목록 새로고침
-  const handleMeetingCreated = () => {
-    setShowCreateMeetingDialog(false);
-    fetchMeetings();
-  };
-
   // 채팅방 선택 핸들러
   const handleChatRoomSelect = (roomId, roomName, isDefault = false) => {
     console.log('🔄 채팅방 선택:', roomId, roomName);
@@ -157,7 +108,6 @@ const WorkspaceDetail = () => {
       setSelectedChatRoom({ id: roomId, name: roomName, is_default: isDefault });
     }
     setActiveMenu("team-chat");
-    setShowMeetingManagement(false);
   };
 
   // 채팅방 생성 핸들러
@@ -251,9 +201,6 @@ const WorkspaceDetail = () => {
         if (data.userProfile) {
           setCurrentUserProfile(data.userProfile);
         }
-
-        // 회의 목록 설정
-        setMeetings(data.meetings || []);
 
         // 🆕 기본 채팅방 설정 (새로고침 시 chatRoomId null 방지)
         const { data: defaultRoom, error: chatRoomError } = await supabase
@@ -551,35 +498,6 @@ const WorkspaceDetail = () => {
     return date.toLocaleDateString("ko-KR");
   };
 
-
-  // fetchMeetings는 회의 생성/수정 후 재조회 시에만 사용
-  const fetchMeetings = async () => {
-    try {
-      const { data: meetingData, error: meetingError } = await supabase
-        .from("meetings")
-        .select(
-          `
-                    *,
-                    meeting_participants (
-                        user_id,
-                        role
-                    )
-                `
-        )
-        .eq("workspace_id", workspaceId)
-        .order("start_time", { ascending: true });
-
-      if (meetingError) {
-        console.error("Error fetching meetings:", meetingError);
-        return;
-      }
-
-      setMeetings(meetingData || []);
-    } catch (error) {
-      console.error("Error fetching meetings:", error);
-    }
-  };
-
   const moreMenuItems = [
     {
       id: "settings",
@@ -651,19 +569,6 @@ const WorkspaceDetail = () => {
   }
 
   const renderMainContent = () => {
-    // 회의 관리 화면이 활성화된 경우
-    if (showMeetingManagement) {
-      return (
-        <div className="h-full">
-          <MeetingManagement
-            workspaceId={workspaceId}
-            onMeetingCreated={fetchMeetings}
-          />
-        </div>
-      );
-    }
-
-    // 기본 메뉴 처리
     switch (activeMenu) {
       case "team-chat":
         return (
@@ -689,6 +594,14 @@ const WorkspaceDetail = () => {
             workspace={workspace}
             currentUser={user}
           />
+        );
+      case "tasks":
+        return (
+          <TaskBoard workspaceId={workspaceId} />
+        );
+      case "calendar":
+        return (
+          <TeamCalendar workspaceId={workspaceId} />
         );
       case "settings":
         return (
@@ -831,12 +744,9 @@ const WorkspaceDetail = () => {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    onClick={() => {
-                      setActiveMenu('dashboard');
-                      setShowMeetingManagement(false);
-                    }}
+                    onClick={() => setActiveMenu('dashboard')}
                     className={`w-full justify-start ${
-                      activeMenu === 'dashboard' && !showMeetingManagement
+                      activeMenu === 'dashboard'
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-accent hover:text-accent-foreground"
                     }`}
@@ -847,18 +757,41 @@ const WorkspaceDetail = () => {
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    onClick={() => {
-                      setActiveMenu('shared-files');
-                      setShowMeetingManagement(false);
-                    }}
+                    onClick={() => setActiveMenu('shared-files')}
                     className={`w-full justify-start ${
-                      activeMenu === 'shared-files' && !showMeetingManagement
+                      activeMenu === 'shared-files'
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-accent hover:text-accent-foreground"
                     }`}
                   >
                     <FolderOpen className="mr-3 h-4 w-4" />
                     공유 폴더
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setActiveMenu('tasks')}
+                    className={`w-full justify-start ${
+                      activeMenu === 'tasks'
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <CheckSquare className="mr-3 h-4 w-4" />
+                    태스크 보드
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => setActiveMenu('calendar')}
+                    className={`w-full justify-start ${
+                      activeMenu === 'calendar'
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <CalendarIcon className="mr-3 h-4 w-4" />
+                    팀 캘린더
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -886,37 +819,6 @@ const WorkspaceDetail = () => {
                   </AccordionContent>
                 </AccordionItem>
 
-                <AccordionItem value="meeting-management">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center">
-                      <CalendarIcon className="mr-3 h-4 w-4" />
-                      미팅 관리
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-2">
-                    <div className="space-y-4 px-2">
-                      <div className="text-sm">
-                        <Calendar
-                          mode="single"
-                          selected={selectedCalendarDate}
-                          onSelect={handleCalendarDateSelect}
-                          modifiers={calendarModifiers}
-                          modifiersStyles={calendarModifiersStyles}
-                          className="rounded-md border p-2"
-                        />
-                      </div>
-                      <Button
-                        onClick={() => setShowCreateMeetingDialog(true)}
-                        className="w-full"
-                        size="sm"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        회의 생성
-                      </Button>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-
                 <AccordionItem value="more">
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center">
@@ -930,14 +832,11 @@ const WorkspaceDetail = () => {
                         <div
                           key={item.id}
                           className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                            activeMenu === item.id && !showMeetingManagement
+                            activeMenu === item.id
                               ? "bg-primary text-primary-foreground"
                               : "hover:bg-accent hover:text-accent-foreground"
                           }`}
-                          onClick={() => {
-                            setActiveMenu(item.id);
-                            setShowMeetingManagement(false);
-                          }}
+                          onClick={() => setActiveMenu(item.id)}
                         >
                           <item.icon className="h-4 w-4" />
                           <span className="text-sm">{item.label}</span>
@@ -1032,15 +931,6 @@ const WorkspaceDetail = () => {
           </div>
         </SidebarInset>
       </div>
-
-      <CreateMeetingDialog
-        open={showCreateMeetingDialog}
-        onOpenChange={setShowCreateMeetingDialog}
-        onMeetingCreated={handleMeetingCreated}
-        workspaceId={workspaceId}
-        currentUserId={user?.user_id}
-        defaultDate={selectedCalendarDate || new Date()}
-      />
 
       <CreateChatRoomDialog
         open={showCreateChatRoomDialog}
