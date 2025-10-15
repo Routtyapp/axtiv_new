@@ -126,17 +126,20 @@ const CreateMeetingDialog = ({
             }
 
             // Add host and selected participants
+            // Filter out currentUserId from selectedParticipants to prevent duplicates
             const participantsToAdd = [
                 {
                     meeting_id: meetingData.id,
                     user_id: currentUserId,
                     role: 'host'
                 },
-                ...selectedParticipants.map(userId => ({
-                    meeting_id: meetingData.id,
-                    user_id: userId,
-                    role: 'participant'
-                }))
+                ...selectedParticipants
+                    .filter(userId => userId !== currentUserId) // Prevent duplicate if currentUserId is in selectedParticipants
+                    .map(userId => ({
+                        meeting_id: meetingData.id,
+                        user_id: userId,
+                        role: 'participant'
+                    }))
             ]
 
             const { error: participantError } = await supabase

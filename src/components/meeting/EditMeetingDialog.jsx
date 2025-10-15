@@ -150,9 +150,10 @@ const EditMeetingDialog = ({
             )
 
             // 추가할 참가자 (새로 선택된 사람)
-            const participantsToAdd = selectedParticipants.filter(
-                id => !existingParticipantIds.includes(id)
-            )
+            // Filter out currentUserId to prevent adding host as participant
+            const participantsToAdd = selectedParticipants
+                .filter(id => !existingParticipantIds.includes(id))
+                .filter(id => id !== currentUserId && id !== meeting.created_by) // Prevent duplicate host
 
             // 참가자 삭제
             if (participantsToRemove.length > 0) {

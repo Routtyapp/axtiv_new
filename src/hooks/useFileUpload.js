@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import OpenAI from 'openai'
 import {
   validateFile,
   generateFilePath,
@@ -100,6 +101,97 @@ const useFileUpload = (workspaceId, user) => {
     setBase64Data({}) // base64 데이터도 초기화
   }, [selectedFiles])
 
+  // OpenAI Vector Store에 파일 업로드
+  const uploadToOpenAIVectorStore = async (file) => {
+    // Vector Store ID를 함수 최상단에서 한 번만 읽기
+    const vectorStoreId = import.meta.env.VITE_VECTOR_STORE_ID
+
+    if (!vectorStoreId) {
+      console.warn('⚠️ VITE_VECTOR_STORE_ID가 설정되지 않았습니다.')
+      return null
+    }
+
+    try {
+      // OpenAI 클라이언트 초기화
+      const openai = new OpenAI({
+        apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        dangerouslyAllowBrowser: true
+      })
+
+      console.log(`📤 Vector Store 업로드 시작: ${file.name}`)
+      console.log(`🔑 Vector Store ID: ${vectorStoreId}`)
+
+      // 1. OpenAI에 파일 업로드
+      const openaiFile = await openai.files.create({
+        file: file,
+        purpose: 'assistants'
+      })
+
+      console.log(`✅ OpenAI 파일 업로드 완료: ${openaiFile.id}`)
+
+      // 2. Vector Store에 파일 첨부
+      const vectorStoreFile = await openai.vectorStores.files.create(
+        vectorStoreId,
+        {
+          file_id: openaiFile.id
+        }
+      )
+
+      console.log(`✅ Vector Store 첨부 완료: ${vectorStoreFile.id}`)
+
+      // 3. 파일 처리 완료 대기 (최대 30초)
+      let fileStatus = vectorStoreFile.status
+      let attempts = 0
+      const maxAttempts = 30
+
+      while (fileStatus !== 'completed' && fileStatus !== 'failed' && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        const updatedFile = await openai.vectorStores.files.retrieve(
+          vectorStoreId,
+          vectorStoreFile.id
+        )
+
+        fileStatus = updatedFile.status
+        attempts++
+
+        console.log(`📊 Vector Store 처리 상태: ${fileStatus} (${attempts}/${maxAttempts})`)
+
+        if (fileStatus === 'completed') {
+          console.log(`✅ Vector Store 처리 완료: ${file.name}`)
+          return {
+            openaiFileId: openaiFile.id,
+            vectorStoreFileId: vectorStoreFile.id,
+            status: 'completed'
+          }
+        } else if (fileStatus === 'failed') {
+          console.error(`❌ Vector Store 처리 실패: ${file.name}`)
+          return {
+            openaiFileId: openaiFile.id,
+            vectorStoreFileId: vectorStoreFile.id,
+            status: 'failed'
+          }
+        }
+      }
+
+      // 타임아웃
+      if (attempts >= maxAttempts) {
+        console.warn(`⚠️ Vector Store 처리 타임아웃: ${file.name}`)
+        return {
+          openaiFileId: openaiFile.id,
+          vectorStoreFileId: vectorStoreFile.id,
+          status: 'timeout'
+        }
+      }
+
+      return null
+
+    } catch (error) {
+      console.error(`❌ Vector Store 업로드 실패 (${file.name}):`, error)
+      throw error
+    }
+  }
+
   // 개별 파일 업로드
   const uploadSingleFile = async (fileItem, messageId) => {
     const { file, id } = fileItem
@@ -124,6 +216,18 @@ const useFileUpload = (workspaceId, user) => {
       const { data: { publicUrl } } = supabase.storage
         .from('chat-files')
         .getPublicUrl(filePath)
+
+      // AI 분석 가능한 파일이면 OpenAI Vector Store에도 업로드
+      let vectorStoreData = null
+      if (fileItem.aiAnalyzable) {
+        try {
+          vectorStoreData = await uploadToOpenAIVectorStore(file)
+          console.log(`🎯 Vector Store 업로드 결과:`, vectorStoreData)
+        } catch (vectorError) {
+          console.warn(`⚠️ Vector Store 업로드 실패 (계속 진행):`, vectorError)
+          // Vector Store 업로드 실패해도 메시지 전송은 계속 진행
+        }
+      }
 
       // 데이터베이스에 파일 메타데이터 저장 (message_id는 나중에 연결)
       const { data: fileData, error: dbError } = await supabase
@@ -152,7 +256,8 @@ const useFileUpload = (workspaceId, user) => {
         type: file.type,
         size: file.size,
         url: publicUrl,
-        path: filePath
+        path: filePath,
+        vectorStore: vectorStoreData // Vector Store 정보 포함
       }
 
     } catch (error) {

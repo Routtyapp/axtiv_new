@@ -64,13 +64,13 @@ const ParticipantSelector = ({ workspaceId, currentUserId, selectedParticipants,
             })
 
             console.log('Combined data:', membersWithEmails)
-            console.log('Current user ID (email):', currentUserId)
+            console.log('Current user ID:', currentUserId)
 
             // Filter out current user since they'll be added as host automatically
-            // Compare by email since currentUserId is user?.email
+            // Compare by both user_id and email to handle both cases
             const otherMembers = membersWithEmails.filter(member => {
-                const isCurrentUser = member.email === currentUserId
-                console.log(`Comparing member ${member.email} with current user ${currentUserId}: ${isCurrentUser ? 'MATCH (filtering out)' : 'different (keeping)'}`)
+                const isCurrentUser = member.user_id === currentUserId || member.email === currentUserId
+                console.log(`Comparing member ${member.email} (${member.user_id}) with current user ${currentUserId}: ${isCurrentUser ? 'MATCH (filtering out)' : 'different (keeping)'}`)
                 return !isCurrentUser
             })
             console.log('Other members (excluding current user):', otherMembers)
