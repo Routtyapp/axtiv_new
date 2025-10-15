@@ -8,6 +8,7 @@ import { Button, Card, Dialog, DialogContent, DialogHeader, DialogTitle } from '
 import { Plus } from 'lucide-react';
 import CreateMeetingDialog from '../meeting/CreateMeetingDialog';
 import MeetingDetail from '../meeting/MeetingDetail';
+import TaskDetailDialog from '../task/TaskDetailDialog';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './TeamCalendar.css';
 
@@ -28,6 +29,8 @@ const TeamCalendar = ({ workspaceId }) => {
   const [showCreateMeetingDialog, setShowCreateMeetingDialog] = useState(false);
   const [showMeetingDetailDialog, setShowMeetingDetailDialog] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [showTaskDetailDialog, setShowTaskDetailDialog] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
@@ -160,20 +163,8 @@ const TeamCalendar = ({ workspaceId }) => {
       setSelectedMeeting(event.data);
       setShowMeetingDetailDialog(true);
     } else if (event.type === 'task') {
-      const dueDate = new Date(event.data.due_date);
-      const now = new Date();
-      const daysRemaining = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
-
-      let status = '';
-      if (daysRemaining < 0) {
-        status = `${Math.abs(daysRemaining)}일 지남`;
-      } else if (daysRemaining === 0) {
-        status = '오늘 마감';
-      } else {
-        status = `D-${daysRemaining}`;
-      }
-
-      alert(`태스크: ${event.data.title}\n상태: ${event.data.status === 'todo' ? '할 일' : event.data.status === 'in_progress' ? '진행 중' : '완료'}\n마감: ${format(event.start, 'PPP', { locale: ko })} (${status})\n담당자: ${event.data.assignee?.user_name || '미지정'}\n설명: ${event.data.description || '없음'}`);
+      setSelectedTask(event.data);
+      setShowTaskDetailDialog(true);
     }
   };
 
@@ -194,6 +185,16 @@ const TeamCalendar = ({ workspaceId }) => {
 
   const handleMeetingDeleted = () => {
     setShowMeetingDetailDialog(false);
+    fetchEvents();
+  };
+
+  const handleTaskUpdated = () => {
+    setShowTaskDetailDialog(false);
+    fetchEvents();
+  };
+
+  const handleTaskDeleted = () => {
+    setShowTaskDetailDialog(false);
     fetchEvents();
   };
 
@@ -309,6 +310,17 @@ const TeamCalendar = ({ workspaceId }) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 태스크 상세 다이얼로그 */}
+      <TaskDetailDialog
+        open={showTaskDetailDialog}
+        onOpenChange={setShowTaskDetailDialog}
+        task={selectedTask}
+        workspaceId={workspaceId}
+        currentUserId={user?.id}
+        onTaskUpdated={handleTaskUpdated}
+        onTaskDeleted={handleTaskDeleted}
+      />
     </div>
   );
 };

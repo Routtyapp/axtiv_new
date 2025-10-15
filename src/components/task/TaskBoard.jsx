@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
@@ -7,6 +7,7 @@ import { Plus, Search } from 'lucide-react';
 import TaskColumn from './TaskColumn';
 import CreateTaskDialog from './CreateTaskDialog';
 import TaskDetailDialog from './TaskDetailDialog';
+import TaskCard from './TaskCard';
 
 const TaskBoard = ({ workspaceId }) => {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ const TaskBoard = ({ workspaceId }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('all');
   const [teamMembers, setTeamMembers] = useState([]);
+  const [activeTask, setActiveTask] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -151,10 +153,29 @@ const TaskBoard = ({ workspaceId }) => {
     }
   };
 
+  const handleDragStart = (event) => {
+    const { active } = event;
+
+    // 드래그 중인 태스크 찾기
+    let task = null;
+    for (const statusTasks of Object.values(tasks)) {
+      const found = statusTasks.find(t => t.id === active.id);
+      if (found) {
+        task = found;
+        break;
+      }
+    }
+
+    setActiveTask(task);
+  };
+
   const handleDragEnd = async (event) => {
     const { active, over } = event;
 
-    if (!over) return;
+    if (!over) {
+      setActiveTask(null);
+      return;
+    }
 
     const taskId = active.id;
     const newStatus = over.id;
@@ -171,11 +192,23 @@ const TaskBoard = ({ workspaceId }) => {
       }
     }
 
-    if (!task || oldStatus === newStatus) return;
+    if (!task || oldStatus === newStatus) {
+      setActiveTask(null);
+      return;
+    }
 
     // Optimistic update
     setTasks(prev => {
       const newTasks = { ...prev };
+
+      // 안전성 체크: 배열이 존재하고 유효한지 확인
+      if (!Array.isArray(newTasks[oldStatus])) {
+        newTasks[oldStatus] = [];
+      }
+      if (!Array.isArray(newTasks[newStatus])) {
+        newTasks[newStatus] = [];
+      }
+
       newTasks[oldStatus] = newTasks[oldStatus].filter(t => t.id !== taskId);
       newTasks[newStatus] = [...newTasks[newStatus], { ...task, status: newStatus }];
       return newTasks;
@@ -209,6 +242,8 @@ const TaskBoard = ({ workspaceId }) => {
       console.error('Error updating task:', error);
       // 롤백
       fetchTasks();
+    } finally {
+      setActiveTask(null);
     }
   };
 
@@ -307,6 +342,7 @@ const TaskBoard = ({ workspaceId }) => {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
           <div className="grid grid-cols-3 gap-6 h-full">
@@ -332,6 +368,17 @@ const TaskBoard = ({ workspaceId }) => {
               taskComments={taskComments}
             />
           </div>
+          <DragOverlay>
+            {activeTask ? (
+              <div className="rotate-3 scale-105">
+                <TaskCard
+                  task={activeTask}
+                  onClick={() => {}}
+                  commentCount={taskComments[activeTask.id] || 0}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
 

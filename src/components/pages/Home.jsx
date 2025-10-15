@@ -11,7 +11,6 @@
  *   - hooks/useAuth (안전한 세션 접근)
  *   - store/userStore (Zustand 전역 스토어)
  *   - components/layout/TopHeader (상단 네비게이션)
- *   - components/ui/ripple (배경 애니메이션)
  * - Export: Home (default)
  * - 사용처: App.jsx (/ 루트 경로)
  * - DB: users 테이블 (user_id로 사용자 정보 조회)
@@ -40,7 +39,6 @@ import userStore from "../../store/userStore";  // Zustand 스토어
 import { useAuth } from "../../hooks/useAuth";  // 안전한 세션 접근
 import { Button, Badge } from "../ui";
 import { Container, TopHeader } from "../layout";
-import { Ripple } from "@/components/ui/ripple";  // 배경 애니메이션 효과
 
 // AI 모델 데이터
 const AI_MODELS = {
@@ -130,15 +128,10 @@ const Home = () => {
 
       {/* Main Content */}
       <div className="pt-16">
-        {/* Hero Section with Ripple */}
+        {/* Hero Section */}
         <div
           className="min-h-screen bg-gradient-to-b from-blue-50 via-purple-50 to-pink-50 dark:from-[#121212] dark:via-[#1E1E1E] dark:to-[#232323] relative overflow-hidden"
         >
-          {/* Ripple Background */}
-          <div className="absolute inset-0" style={{ overflow: "hidden" }}>
-            <Ripple mainCircleSize={350} numCircles={10} />
-          </div>
-
           <div style={{ position: "relative", zIndex: 1, padding: "1.5rem" }}>
           {user ? (
             <Flex
