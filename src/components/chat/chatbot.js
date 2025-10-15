@@ -22,7 +22,6 @@ const generateOpenAIResponse = async (userMessages, model) => {
         {
           type: "file_search",
           vector_store_ids: [import.meta.env.VITE_VECTOR_STORE_ID],
-          max_num_results: 20,
         },
       ],
     };
