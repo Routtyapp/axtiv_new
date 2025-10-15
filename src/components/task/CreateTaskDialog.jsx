@@ -53,7 +53,11 @@ const CreateTaskDialog = ({ open, onOpenChange, workspaceId, currentUserId, onTa
         return;
       }
 
-      setTeamMembers(data.map(member => member.users).filter(Boolean));
+      setTeamMembers(
+        data
+          .map(member => member.users)
+          .filter(user => user && user.user_id && user.user_id.trim() !== '')
+      );
     } catch (error) {
       console.error('Error fetching team members:', error);
     }
@@ -74,7 +78,7 @@ const CreateTaskDialog = ({ open, onOpenChange, workspaceId, currentUserId, onTa
           workspace_id: workspaceId,
           title: title.trim(),
           description: description.trim() || null,
-          assignee_id: assigneeId || null,
+          assignee_id: assigneeId && assigneeId !== 'unassigned' ? assigneeId : null,
           due_date: dueDate || null,
           created_by: currentUserId,
           status: 'todo'
@@ -157,26 +161,28 @@ const CreateTaskDialog = ({ open, onOpenChange, workspaceId, currentUserId, onTa
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">미지정</SelectItem>
-                {teamMembers.map((member) => (
-                  <SelectItem key={member.user_id} value={member.user_id}>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-5 h-5">
-                        {member.profile_image_url ? (
-                          <img
-                            src={member.profile_image_url}
-                            alt={member.user_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <AvatarFallback className="text-xs">
-                            {member.user_name?.charAt(0).toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span>{member.user_name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {teamMembers.map((member) =>
+                  member.user_id && member.user_id.trim() !== '' ? (
+                    <SelectItem key={member.user_id} value={member.user_id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-5 h-5">
+                          {member.profile_image_url ? (
+                            <img
+                              src={member.profile_image_url}
+                              alt={member.user_name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <AvatarFallback className="text-xs">
+                              {member.user_name?.charAt(0).toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span>{member.user_name}</span>
+                      </div>
+                    </SelectItem>
+                  ) : null
+                )}
               </SelectContent>
             </Select>
           </div>

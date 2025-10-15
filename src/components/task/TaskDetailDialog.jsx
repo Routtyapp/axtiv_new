@@ -38,7 +38,7 @@ const TaskDetailDialog = ({ open, onOpenChange, task, workspaceId, currentUserId
     if (open && task) {
       setTitle(task.title);
       setDescription(task.description || '');
-      setAssigneeId(task.assignee_id || '');
+      setAssigneeId(task.assignee_id || 'unassigned');
       setDueDate(task.due_date ? task.due_date.split('T')[0] : '');
       setStatus(task.status);
       fetchTeamMembers();
@@ -66,7 +66,11 @@ const TaskDetailDialog = ({ open, onOpenChange, task, workspaceId, currentUserId
         return;
       }
 
-      setTeamMembers(data.map(member => member.users).filter(Boolean));
+      setTeamMembers(
+        data
+          .map(member => member.users)
+          .filter(user => user && user.user_id && user.user_id.trim() !== '')
+      );
     } catch (error) {
       console.error('Error fetching team members:', error);
     }
@@ -109,7 +113,7 @@ const TaskDetailDialog = ({ open, onOpenChange, task, workspaceId, currentUserId
       const updates = {
         title: title.trim(),
         description: description.trim() || null,
-        assignee_id: assigneeId || null,
+        assignee_id: assigneeId && assigneeId !== 'unassigned' ? assigneeId : null,
         due_date: dueDate || null,
         status,
         updated_at: new Date().toISOString()
@@ -325,12 +329,14 @@ const TaskDetailDialog = ({ open, onOpenChange, task, workspaceId, currentUserId
                       <SelectValue placeholder="담당자 선택" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">미지정</SelectItem>
-                      {teamMembers.map((member) => (
-                        <SelectItem key={member.user_id} value={member.user_id}>
-                          {member.user_name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="unassigned">미지정</SelectItem>
+                      {teamMembers.map((member) =>
+                        member.user_id && member.user_id.trim() !== '' ? (
+                          <SelectItem key={member.user_id} value={member.user_id}>
+                            {member.user_name}
+                          </SelectItem>
+                        ) : null
+                      )}
                     </SelectContent>
                   </Select>
                 ) : (

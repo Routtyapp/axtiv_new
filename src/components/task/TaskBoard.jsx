@@ -147,7 +147,11 @@ const TaskBoard = ({ workspaceId }) => {
         return;
       }
 
-      setTeamMembers(data.map(member => member.users).filter(Boolean));
+      setTeamMembers(
+        data
+          .map(member => member.users)
+          .filter(user => user && user.user_id && user.user_id.trim() !== '')
+      );
     } catch (error) {
       console.error('Error fetching team members:', error);
     }
@@ -327,11 +331,13 @@ const TaskBoard = ({ workspaceId }) => {
             <SelectContent>
               <SelectItem value="all">모든 담당자</SelectItem>
               <SelectItem value="unassigned">미지정</SelectItem>
-              {teamMembers.map((member) => (
-                <SelectItem key={member.user_id} value={member.user_id}>
-                  {member.user_name}
-                </SelectItem>
-              ))}
+              {teamMembers.map((member) =>
+                member.user_id && member.user_id.trim() !== '' ? (
+                  <SelectItem key={member.user_id} value={member.user_id}>
+                    {member.user_name}
+                  </SelectItem>
+                ) : null
+              )}
             </SelectContent>
           </Select>
         </div>
