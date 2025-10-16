@@ -1,58 +1,69 @@
-import { Flex, Heading, Text } from '@radix-ui/themes'
 import { Avatar, Badge, ScrollArea, AvatarFallback } from '../ui'
 
 const MemberList = ({ members, currentUserId }) => {
+    // 사용자 표시 이름 추출 함수
+    const getDisplayName = (member, isCurrentUser) => {
+        if (isCurrentUser) return '나'
+
+        // user_id가 이메일 형식이면 @ 앞부분만 추출
+        if (member.user_id && member.user_id.includes('@')) {
+            return member.user_id.split('@')[0]
+        }
+
+        return member.user_id || '알 수 없음'
+    }
+
     return (
-        <div className="border-gray-200 dark:border-gray-700">
-            <div className="p-3">
-                {members.length === 0 ? (
-                    <Flex align="center" justify="center" py="4">
-                        <Text size="2" className="text-gray-500 dark:text-white">멤버가 없습니다.</Text>
-                    </Flex>
-                ) : (
-                    <ScrollArea style={{ maxHeight: '400px' }}>
-                        <Flex direction="column" gap="2">
-                            {members.map((member) => (
-                                <Flex
+        <div>
+            {members.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">멤버가 없습니다.</p>
+            ) : (
+                <ScrollArea className="h-80">
+                    <div className="space-y-2 pr-4">
+                        {members.map((member) => {
+                            const isCurrentUser = member.user_id === currentUserId
+                            const displayName = getDisplayName(member, isCurrentUser)
+
+                            return (
+                                <div
                                     key={member.id}
-                                    align="center"
-                                    gap="3"
-                                    p="3"
-                                    className={`rounded-lg border ${
-                                        member.user_id === currentUserId
-                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                                            : 'border-gray-200 dark:border-gray-700'
+                                    className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
+                                        isCurrentUser
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50'
+                                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
                                     }`}
                                 >
+                                    {/* 아바타 */}
                                     <Avatar>
                                         <AvatarFallback className="bg-gradient-to-br from-purple-400 to-blue-500 text-white font-semibold">
-                                            {member.user_id?.charAt(0)?.toUpperCase() || '?'}
+                                            {displayName?.charAt(0)?.toUpperCase() || '?'}
                                         </AvatarFallback>
                                     </Avatar>
 
-                                    <Flex direction="column" flexGrow="1" style={{ minWidth: 0 }}>
-                                        <Flex align="center" gap="2">
-                                            <Text size="2" weight="medium" className="truncate dark:text-white">
-                                                {member.user_id === currentUserId ? '나' : member.user_id.split('@')[0] || member.user_id}
-                                            </Text>
+                                    {/* 사용자 정보 */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                                {displayName}
+                                            </p>
                                             {member.role === 'admin' && (
                                                 <Badge variant="secondary" className="text-xs">
                                                     관리자
                                                 </Badge>
                                             )}
-                                        </Flex>
+                                        </div>
                                         {member.email && (
-                                            <Text size="1" className="text-gray-500 dark:text-gray-400 truncate">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                 {member.email}
-                                            </Text>
+                                            </p>
                                         )}
-                                    </Flex>
-                                </Flex>
-                            ))}
-                        </Flex>
-                    </ScrollArea>
-                )}
-            </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </ScrollArea>
+            )}
         </div>
     )
 }

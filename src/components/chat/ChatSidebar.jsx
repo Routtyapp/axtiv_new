@@ -16,6 +16,8 @@ import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import LeaveChatRoomDialog from "./LeaveChatRoomDialog";
 import MemberList from "./MemberList";
+import GenerateMeetingNotesDialog from "./GenerateMeetingNotesDialog";
+import MeetingNotesViewer from "./MeetingNotesViewer";
 import { supabase } from "../../lib/supabase";
 
 // 🚨 임시 기능: 자동 메시지 전송 (나중에 삭제 예정)
@@ -69,6 +71,11 @@ const ChatSidebar = ({
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const [chatMembers, setChatMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  // 📝 회의록 생성 관련 상태
+  const [showMeetingNotesDialog, setShowMeetingNotesDialog] = useState(false);
+  const [showMeetingNotesViewer, setShowMeetingNotesViewer] = useState(false);
+  const [generatedMeetingNotes, setGeneratedMeetingNotes] = useState(null);
 
   // 🚨 임시 기능: 자동 메시지 전송 핸들러 (나중에 삭제 예정)
   const handleToggleAutoMessage = () => {
@@ -242,6 +249,24 @@ const ChatSidebar = ({
     setShowMembersDialog(true);
   };
 
+  // 📝 회의록 생성 다이얼로그 열기 핸들러
+  const handleOpenMeetingNotesDialog = () => {
+    setShowMeetingNotesDialog(true);
+  };
+
+  // 📝 회의록 생성 성공 핸들러
+  const handleMeetingNotesGenerated = (result) => {
+    setGeneratedMeetingNotes(result);
+    setShowMeetingNotesDialog(false);
+    setShowMeetingNotesViewer(true);
+  };
+
+  // 📝 회의록 저장 성공 핸들러
+  const handleMeetingNotesSaved = (savedNote) => {
+    console.log('회의록 저장 완료:', savedNote);
+    setGeneratedMeetingNotes(null);
+  };
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-[#121212]">
       <ChatHeader
@@ -251,6 +276,7 @@ const ChatSidebar = ({
         onLeaveRoom={chatRoomId ? () => setShowLeaveDialog(true) : null}
         memberCount={chatMembers.length}
         onShowMembers={handleShowMembers}
+        onGenerateMeetingNotes={chatRoomId ? handleOpenMeetingNotesDialog : null}
       />
 
       {/* 🚨 임시 기능: 자동 메시지 전송 버튼 (나중에 삭제 예정) */}
@@ -327,6 +353,31 @@ const ChatSidebar = ({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 📝 회의록 생성 다이얼로그 */}
+      {chatRoomId && (
+        <GenerateMeetingNotesDialog
+          open={showMeetingNotesDialog}
+          onOpenChange={setShowMeetingNotesDialog}
+          onSuccess={handleMeetingNotesGenerated}
+          workspaceId={workspaceId}
+          chatRoomId={chatRoomId}
+          chatRoomName={chatRoomName}
+        />
+      )}
+
+      {/* 📝 회의록 뷰어 다이얼로그 */}
+      {generatedMeetingNotes && (
+        <MeetingNotesViewer
+          open={showMeetingNotesViewer}
+          onOpenChange={setShowMeetingNotesViewer}
+          content={generatedMeetingNotes.content}
+          metadata={generatedMeetingNotes.metadata}
+          onSaveSuccess={handleMeetingNotesSaved}
+          workspaceId={workspaceId}
+          chatRoomId={chatRoomId}
+        />
+      )}
     </div>
   );
 };

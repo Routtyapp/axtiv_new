@@ -1,8 +1,8 @@
 import { Flex, Heading, Text } from '@radix-ui/themes'
-import { LogOut, Users } from 'lucide-react'
+import { LogOut, Users, FileText } from 'lucide-react'
 import { Button, Tooltip } from '../ui'
 
-const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomName, memberCount, onShowMembers }) => {
+const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomName, memberCount, onShowMembers, onGenerateMeetingNotes }) => {
     const getStatusColor = () => {
         switch (realtimeStatus) {
             case 'SUBSCRIBED': return 'bg-green-500'
@@ -57,19 +57,40 @@ const ChatHeader = ({ workspaceName, realtimeStatus, onLeaveRoom, currentRoomNam
                         </Tooltip>
                     )}
                 </Flex>
-                {/* 채팅방 나가기 버튼 */}
-                {onLeaveRoom && currentRoomName && (
-                    <Tooltip content="채팅방 나가기">
-                        <Button
-                            variant="soft"
-                            color="red"
-                            size="2"
-                            onClick={onLeaveRoom}
-                        >
-                            <LogOut className="h-4 w-4" />
-                        </Button>
-                    </Tooltip>
-                )}
+                {/* 액션 버튼 그룹 */}
+                <Flex gap="3" align="center">
+                    {/* 회의록 생성 버튼 */}
+                    {onGenerateMeetingNotes && currentRoomName && (
+                        <Tooltip content="대화 내용을 분석하여 회의록을 생성합니다">
+                            <Button
+                                variant="soft"
+                                color="blue"
+                                size="2"
+                                onClick={onGenerateMeetingNotes}
+                                className="flex items-center gap-2"
+                            >
+                                <FileText className="h-5 w-5" />
+                                <span className="hidden md:inline">회의록 생성</span>
+                            </Button>
+                        </Tooltip>
+                    )}
+
+                    {/* 채팅방 나가기 버튼 */}
+                    {onLeaveRoom && currentRoomName && (
+                        <Tooltip content="채팅방에서 나가기">
+                            <Button
+                                variant="soft"
+                                color="red"
+                                size="2"
+                                onClick={onLeaveRoom}
+                                className="flex items-center gap-2"
+                            >
+                                <LogOut className="h-5 w-5" />
+                                <span className="hidden md:inline">나가기</span>
+                            </Button>
+                        </Tooltip>
+                    )}
+                </Flex>
             </Flex>
         </div>
     )
